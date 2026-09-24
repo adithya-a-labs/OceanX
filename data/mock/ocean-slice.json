@@ -1,0 +1,1 @@
+{"variable":"temperature","unit":"degC","time":"2026-09-24T12:00:00Z","depth":100,"bounds":{"north":18,"south":12,"west":82,"east":90},"latitudes":[12,15,18],"longitudes":[82,86,90],"values":[[27.1,27.5,27.2],[26.8,27.0,26.9],[26.2,26.4,26.3]]}
