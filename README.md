@@ -42,22 +42,22 @@ OceanX is a **monorepo** so all six members work in the same project while ownin
 OceanX/
 ├── frontend/
 │   └── src/
-│       ├── globe/          # Member 1
-│       ├── dashboard/      # Member 2
-│       ├── charts/         # Member 2
-│       ├── api/            # Member 4
+│       ├── globe/          # Amulya
+│       ├── dashboard/      # Krishna Anilraj
+│       ├── charts/         # Krishna Anilraj
+│       ├── api/            # Prabhu
 │       ├── state/          # Shared frontend state
 │       └── types/          # Shared contracts
 │
-├── backend/                # Member 4
+├── backend/                # Prabhu
 │   └── app/
 │       ├── api/
 │       ├── schemas/
 │       └── services/
 │
-├── ocean_data/             # Member 3
-├── observations/           # Member 5
-├── analytics/              # Member 6
+├── ocean_data/             # Adithya
+├── observations/           # Anush
+├── analytics/              # Krishna Kumar Jha
 │
 ├── data/
 │   ├── mock/
@@ -75,12 +75,12 @@ OceanX/
 
 | Member | Branch | Main ownership |
 |---|---|---|
-| Member 1 | `feat/globe` | 3D globe and ocean visualization |
-| Member 2 | `feat/dashboard` | Dashboard, controls and charts |
-| Member 3 | `feat/ocean-data` | NetCDF/Xarray data pipeline |
-| Member 4 | `feat/backend-api` | FastAPI backend and frontend API client |
-| Member 5 | `feat/argo-validation` | Argo observations and model validation |
-| Member 6 | `feat/integration` | Currents, indicators, Docker and integration |
+| Amulya | `feat/globe` | 3D globe and ocean visualization |
+| Krishna Anilraj | `feat/dashboard` | Dashboard, controls and charts |
+| Adithya | `feat/ocean-data` | NetCDF/Xarray data pipeline |
+| Prabhu | `feat/backend-api` | FastAPI backend and frontend API client |
+| Anush | `feat/argo-validation` | Argo observations and model validation |
+| Krishna Kumar Jha | `feat/integration` | Currents, indicators, Docker and integration |
 
 Permanent branches:
 
@@ -93,7 +93,22 @@ Feature work should normally merge into `develop` through pull requests.
 
 # Team roles and scope
 
-## Member 1 — 3D Globe & Ocean Visualization
+## Team roster
+
+| Name | Role |
+|---|---|
+| **Amulya** | 3D Globe & Ocean Visualization |
+| **Krishna Anilraj** | Dashboard, Controls & Scientific UI |
+| **Adithya** | Ocean Data Pipeline |
+| **Prabhu** | Backend API & Data Gateway |
+| **Anush** | Argo Observations & Model Validation |
+| **Krishna Kumar Jha** | Currents, Indicators & Integration + Frontend Oversight |
+
+**Frontend team:** Amulya + Krishna Anilraj, with **Krishna Kumar Jha overseeing frontend development, architecture and integration quality**.
+
+---
+
+## Amulya — 3D Globe & Ocean Visualization
 
 **Branch:** `feat/globe`  
 **Primary folder:** `frontend/src/globe/`
@@ -104,7 +119,7 @@ Build the interactive visual experience that makes OceanX feel like **Google Ear
 
 ### Scope
 
-Member 1 owns:
+Amulya owns:
 
 - 3D Earth / globe
 - Camera movement, zoom and rotation
@@ -128,18 +143,18 @@ Member 1 owns:
 - [ ] Support temperature and salinity layers
 - [ ] React to depth changes
 - [ ] React to time changes
-- [ ] Display current arrows/particles from Member 6
-- [ ] Display Argo markers from Member 5
+- [ ] Display current arrows/particles from Krishna Kumar Jha
+- [ ] Display Argo markers from Anush
 - [ ] Make observation markers clickable
 - [ ] Handle loading/no-data states
 - [ ] Check performance on the demo laptop
 
 ### Inputs from other members
 
-- Ocean slices from Member 4
-- UI state from Member 2
-- Argo marker data from Member 5
-- Current vectors from Member 6
+- Ocean slices from Prabhu
+- UI state from Krishna Anilraj
+- Argo marker data from Anush
+- Current vectors from Krishna Kumar Jha
 
 ### Definition of done
 
@@ -147,7 +162,7 @@ A user can move around the globe, see real ocean data, change depth/time, and vi
 
 ---
 
-## Member 2 — Dashboard, Controls & Scientific UI
+## Krishna Anilraj — Dashboard, Controls & Scientific UI
 
 **Branch:** `feat/dashboard`  
 **Primary folders:** `frontend/src/dashboard/`, `frontend/src/charts/`
@@ -158,7 +173,7 @@ Build everything the user **clicks, reads and understands** around the 3D ocean.
 
 ### Scope
 
-Member 2 owns:
+Krishna Anilraj owns:
 
 - Main application layout
 - Variable selector
@@ -190,9 +205,9 @@ Member 2 owns:
 
 ### Inputs from other members
 
-- Metadata/API values from Member 4
-- Selected observation/comparison data from Member 5
-- Indicators from Member 6
+- Metadata/API values from Prabhu
+- Selected observation/comparison data from Anush
+- Indicators from Krishna Kumar Jha
 
 ### Definition of done
 
@@ -200,7 +215,7 @@ A new user can understand how to switch variables, change depth/time, turn layer
 
 ---
 
-## Member 3 — Ocean Data Pipeline
+## Adithya — Ocean Data Pipeline
 
 **Branch:** `feat/ocean-data`  
 **Primary folder:** `ocean_data/`
@@ -211,7 +226,7 @@ Turn real scientific ocean files into **small, clean data slices** that the rest
 
 ### Scope
 
-Member 3 owns:
+Adithya owns:
 
 - NetCDF/HDF5 inspection
 - Xarray loading
@@ -247,7 +262,7 @@ Member 3 owns:
 
 ### Output
 
-Member 3 should provide functions that conceptually answer:
+Adithya should provide functions that conceptually answer:
 
 > Give me this variable, for this region, at this depth and time.
 
@@ -259,7 +274,7 @@ Given variable + depth + time + geographic bounds, the module reliably returns t
 
 ---
 
-## Member 4 — Backend API & Data Gateway
+## Prabhu — Backend API & Data Gateway
 
 **Branch:** `feat/backend-api`  
 **Primary folders:** `backend/`, `frontend/src/api/`
@@ -270,7 +285,7 @@ Create the stable bridge between scientific Python modules and the web frontend.
 
 ### Scope
 
-Member 4 owns:
+Prabhu owns:
 
 - FastAPI application
 - Metadata endpoint
@@ -300,7 +315,7 @@ GET /api/compare/{observation_id}
 - [ ] Create mock metadata response
 - [ ] Create mock ocean-data response
 - [ ] Freeze response formats with frontend members
-- [ ] Connect ocean endpoint to Member 3
+- [ ] Connect ocean endpoint to Adithya
 - [ ] Add observations endpoint
 - [ ] Add comparison endpoint
 - [ ] Validate variable/depth/time parameters
@@ -312,9 +327,9 @@ GET /api/compare/{observation_id}
 
 ### Inputs from other members
 
-- Scientific model functions from Member 3
-- Argo/comparison functions from Member 5
-- Indicator outputs from Member 6 if exposed through the API
+- Scientific model functions from Adithya
+- Argo/comparison functions from Anush
+- Indicator outputs from Krishna Kumar Jha if exposed through the API
 
 ### Definition of done
 
@@ -322,7 +337,7 @@ The frontend can request metadata, ocean slices, observations and comparison res
 
 ---
 
-## Member 5 — Argo Observations & Model Validation
+## Anush — Argo Observations & Model Validation
 
 **Branch:** `feat/argo-validation`  
 **Primary folder:** `observations/`
@@ -333,7 +348,7 @@ Connect the virtual ocean model with **real ocean measurements**.
 
 ### Scope
 
-Member 5 owns:
+Anush owns:
 
 - Argo profile ingestion
 - Float ID/location/time extraction
@@ -367,8 +382,8 @@ Member 5 owns:
 
 ### Inputs from other members
 
-- Model-data access from Member 3
-- API exposure through Member 4
+- Model-data access from Adithya
+- API exposure through Prabhu
 
 ### Definition of done
 
@@ -376,25 +391,25 @@ Selecting an Argo float can produce a clear model-vs-observation profile and an 
 
 ---
 
-## Member 6 — Currents, Indicators & Integration
+## Krishna Kumar Jha — Currents, Indicators & Integration
 
 **Branch:** `feat/integration`  
 **Primary folders/files:** `analytics/`, `scripts/`, integration tests, Docker configuration
 
 ### Main goal
 
-Make OceanX feel alive with current flow and make sure **all six members' work actually runs together**.
+Make OceanX feel alive with current flow, make sure **all six members' work actually runs together**, and **oversee frontend development** so the globe, dashboard, shared state and API integration stay consistent.
 
 ### Scope
 
-Member 6 owns three areas.
+Krishna Kumar Jha owns three areas.
 
 #### 1. Ocean currents
 
 - Consume U/V current components
 - Calculate speed/direction where needed
 - Downsample current vectors for visualization
-- Give Member 1 a simple render-friendly vector format
+- Give Amulya a simple render-friendly vector format
 
 #### 2. MVP indicator
 
@@ -404,7 +419,15 @@ Recommended first indicator:
 
 > Show a warning when model-observation RMSE exceeds a configurable threshold.
 
-#### 3. Integration
+#### 3. Frontend oversight
+
+- Review frontend architecture and integration decisions
+- Coordinate Amulya's globe work with Krishna Anilraj's dashboard/state work
+- Check that frontend uses shared types and API contracts correctly
+- Review frontend PRs that affect cross-module behavior
+- Help resolve integration/performance issues without taking over their day-to-day feature implementation
+
+#### 4. Integration
 
 - Docker/dev setup
 - Environment variables
@@ -418,8 +441,10 @@ Recommended first indicator:
 - [ ] Understand U/V current components
 - [ ] Convert U/V to render-friendly vectors
 - [ ] Downsample vectors if needed
-- [ ] Agree on vector format with Member 1
+- [ ] Agree on vector format with Amulya
 - [ ] Implement one configurable indicator
+- [ ] Review major frontend integration changes
+- [ ] Check globe/dashboard compatibility before merge
 - [ ] Maintain `.env.example`
 - [ ] Finish Docker/dev startup
 - [ ] Maintain integration tests
@@ -466,10 +491,10 @@ Nobody should wait for another member to finish.
 Examples:
 
 - Members 1 and 2 start with `data/mock/`.
-- Member 4 serves mock API responses before real science modules are ready.
-- Member 3 develops/test the ocean pipeline independently.
-- Member 5 develops Argo parsing/comparison independently.
-- Member 6 develops current-vector transformation using sample U/V data.
+- Prabhu serves mock API responses before real science modules are ready.
+- Adithya develops/test the ocean pipeline independently.
+- Anush develops Argo parsing/comparison independently.
+- Krishna Kumar Jha develops current-vector transformation using sample U/V data.
 
 As real components become ready, replace mocks without changing the contract.
 
