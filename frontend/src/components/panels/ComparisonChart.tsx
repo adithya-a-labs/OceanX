@@ -65,6 +65,148 @@ export const ComparisonChart = ({
     const displayModel = [...model].reverse();
     const displayDifference = showDifference ? [...difference].reverse() : [];
 
+    const hasDifference = showDifference && displayDifference.length > 0;
+    const depthMax = Math.max(...displayDepth) * 1.05;
+    const valueMin = Math.min(...displayObserved, ...displayModel) * 0.95;
+    const valueMax = Math.max(...displayObserved, ...displayModel) * 1.05;
+
+    const xAxis: any[] = [];
+    const yAxis: any[] = [];
+    const grid: any[] = [];
+
+    // Shared depth axis: both plots must span the exact same range, otherwise the
+    // difference bars drift out of register with the profile lines above them.
+    const depthAxis = (gridIndex: number) => ({
+      type: 'value',
+      inverse: true,
+      min: 0,
+      max: depthMax,
+      gridIndex,
+    });
+
+    if (!hasDifference) {
+      // Single plot. Labels are auto-contained, so the axis gutters stay implicit.
+      xAxis.push({
+        type: 'value',
+        name: unit,
+        nameLocation: 'middle',
+        nameGap: compact ? 20 : 30,
+        nameTextStyle: { color: axisNameColor, fontSize: 10 },
+        axisLabel: { color: axisLabelColor, fontSize: 10 },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        min: valueMin,
+        max: valueMax,
+      });
+
+      yAxis.push({
+        ...depthAxis(0),
+        name: 'Depth (m)',
+        nameLocation: 'middle',
+        nameGap: 35,
+        nameTextStyle: { color: axisNameColor, fontSize: 10 },
+        axisLabel: { color: axisLabelColor, fontSize: 10 },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: splitLineColor } },
+      });
+
+      grid.push({
+        left: compact ? 40 : 50,
+        right: 40,
+        top: compact ? 10 : 30,
+        bottom: 40,
+        containLabel: true,
+      });
+    } else {
+      // Two stacked plots sharing the depth axis: the profile on top, the
+      // difference strip underneath. Previously both grids used the same top and
+      // bottom, so the difference bars were drawn straight over the profile lines.
+      //
+      // Vertical budget, outside the plot areas:
+      //   topPad    legend, plus the profile axis drawn above its plot
+      //   gap       breathing room between the two plots
+      //   bottomPad the difference axis labels and unit, drawn below its plot
+      const hasLegend = !compact;
+      const topPad = hasLegend ? 46 : 22;
+      const gap = 8;
+      const bottomPad = 30;
+      const usable = Math.max(64, height - topPad - gap - bottomPad);
+      const profileHeight = Math.round(usable * 0.6);
+      const differenceHeight = usable - profileHeight;
+
+      // Fixed gutters rather than containLabel: both plots then start their
+      // series at the identical x, so the bars line up under the profile.
+      const left = 52;
+      const right = 12;
+
+      // Symmetric around zero so the sign colours actually mean something, and
+      // so the bars grow from a visible zero baseline.
+      const maxAbsDifference = Math.max(0, ...displayDifference.map((v) => Math.abs(v)));
+      const differenceLimit = maxAbsDifference > 0 ? maxAbsDifference * 1.15 : 1;
+
+      xAxis.push({
+        type: 'value',
+        position: 'top',
+        gridIndex: 0,
+        name: unit,
+        nameLocation: 'middle',
+        nameGap: 26,
+        nameTextStyle: { color: axisNameColor, fontSize: 10 },
+        axisLabel: { color: axisLabelColor, fontSize: 10 },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        min: valueMin,
+        max: valueMax,
+      });
+
+      yAxis.push({
+        ...depthAxis(0),
+        name: 'Depth (m)',
+        nameLocation: 'middle',
+        nameGap: 32,
+        nameTextStyle: { color: axisNameColor, fontSize: 10 },
+        axisLabel: { color: axisLabelColor, fontSize: 10 },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: splitLineColor } },
+      });
+
+      grid.push({ left, right, top: topPad, height: profileHeight, containLabel: false });
+
+      xAxis.push({
+        type: 'value',
+        position: 'bottom',
+        gridIndex: 1,
+        name: `Diff (${unit})`,
+        nameLocation: 'middle',
+        nameGap: 16,
+        nameTextStyle: { color: axisNameColor, fontSize: 10 },
+        axisLabel: {
+          color: axisLabelColor,
+          fontSize: 10,
+          formatter: (v: number) => v.toFixed(2),
+        },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        min: -differenceLimit,
+        max: differenceLimit,
+      });
+
+      yAxis.push({ ...depthAxis(1), show: false });
+
+      grid.push({
+        left,
+        right,
+        top: topPad + profileHeight + gap,
+        height: differenceHeight,
+        containLabel: false,
+      });
+    }
+
     const series: any[] = [
       {
         name: 'Observed',
@@ -90,7 +232,7 @@ export const ComparisonChart = ({
       },
     ];
 
-    if (showDifference && displayDifference.length > 0) {
+    if (hasDifference) {
       series.push({
         name: 'Difference',
         type: 'bar',
@@ -102,83 +244,6 @@ export const ComparisonChart = ({
         xAxisIndex: 1,
         yAxisIndex: 1,
         encode: { x: 0, y: 1 },
-      });
-    }
-
-    const xAxis: any[] = [
-      {
-        type: 'value',
-        name: unit,
-        nameLocation: 'middle',
-        nameGap: compact ? 20 : 30,
-        nameTextStyle: { color: axisNameColor, fontSize: 10 },
-        axisLabel: { color: axisLabelColor, fontSize: 10 },
-        axisLine: { lineStyle: { color: axisLineColor } },
-        axisTick: { show: false },
-        splitLine: { lineStyle: { color: splitLineColor } },
-        min: Math.min(...displayObserved, ...displayModel) * 0.95,
-        max: Math.max(...displayObserved, ...displayModel) * 1.05,
-      },
-    ];
-
-    const yAxis: any[] = [
-      {
-        type: 'value',
-        name: 'Depth (m)',
-        nameLocation: 'middle',
-        nameGap: 35,
-        nameTextStyle: { color: axisNameColor, fontSize: 10 },
-        axisLabel: { color: axisLabelColor, fontSize: 10 },
-        axisLine: { lineStyle: { color: axisLineColor } },
-        axisTick: { show: false },
-        splitLine: { lineStyle: { color: splitLineColor } },
-        inverse: true,
-        min: 0,
-        max: Math.max(...displayDepth) * 1.05,
-      },
-    ];
-
-    const grid: any[] = [
-      {
-        left: compact ? 40 : 50,
-        right: showDifference ? 80 : 40,
-        top: compact ? 10 : 30,
-        bottom: 40,
-        containLabel: true,
-      },
-    ];
-
-    if (showDifference) {
-      xAxis.push({
-        type: 'value',
-        name: `Diff (${unit})`,
-        nameLocation: 'middle',
-        nameGap: 30,
-        nameTextStyle: { color: axisNameColor, fontSize: 10 },
-        axisLabel: { color: axisLabelColor, fontSize: 10 },
-        axisLine: { lineStyle: { color: axisLineColor } },
-        axisTick: { show: false },
-        splitLine: { show: false },
-        gridIndex: 1,
-        position: 'top',
-        offset: 0,
-      });
-
-      yAxis.push({
-        type: 'value',
-        inverse: true,
-        min: 0,
-        max: Math.max(...displayDepth) * 1.05,
-        gridIndex: 1,
-        show: false,
-      });
-
-      grid.push({
-        left: compact ? 40 : 50,
-        right: 40,
-        top: compact ? 10 : 30,
-        bottom: 40,
-        containLabel: true,
       });
     }
 
@@ -194,16 +259,31 @@ export const ComparisonChart = ({
         borderColor: axisLineColor,
         borderWidth: 1,
         textStyle: { color: c.text.primary },
-        formatter: (params: any[]) => {
-          const param = params[0];
-          const paramDepth = param.value[1];
-          const value = param.value[0];
+        formatter: (params: any) => {
+          // With two value axes on one axis trigger, params[0] is whichever
+          // series ECharts happens to order first. Look each one up by name.
+          const list = Array.isArray(params) ? params : [params];
+          const pick = (name: string) => list.find((p: any) => p.seriesName === name);
+          const observedPoint = pick('Observed');
+          const modelPoint = pick('Model');
+          const differencePoint = pick('Difference');
+
+          const index = observedPoint?.dataIndex ?? modelPoint?.dataIndex ?? 0;
+          const paramDepth = observedPoint?.value?.[1] ?? modelPoint?.value?.[1] ?? 0;
+          const observedValue = observedPoint?.value?.[0] ?? displayObserved[index];
+          const modelValue = modelPoint?.value?.[0] ?? displayModel[index];
+          const differenceValue = differencePoint?.value?.[0] ?? displayDifference[index];
+
           return `
             <div style="padding: 4px 0;">
-              <div style="color: ${c.text.secondary}; font-size: 11px; margin-bottom: 4px;">Depth: ${paramDepth.toFixed(0)}m</div>
-              <div style="color: ${observedColor};">● Observed: ${value.toFixed(2)}${unit}</div>
-              <div style="color: ${modelColor};">○ Model: ${displayModel[param.dataIndex]?.toFixed(2)}${unit}</div>
-              ${showDifference ? `<div style="color: ${displayDifference[param.dataIndex] >= 0 ? positiveDiff : negativeDiff};">▌ Difference: ${displayDifference[param.dataIndex]?.toFixed(2)}${unit}</div>` : ''}
+              <div style="color: ${c.text.secondary}; font-size: 11px; margin-bottom: 4px;">Depth: ${Number(paramDepth).toFixed(0)}m</div>
+              <div style="color: ${observedColor};">● Observed: ${Number(observedValue).toFixed(2)}${unit}</div>
+              <div style="color: ${modelColor};">○ Model: ${Number(modelValue).toFixed(2)}${unit}</div>
+              ${
+                hasDifference
+                  ? `<div style="color: ${Number(differenceValue) >= 0 ? positiveDiff : negativeDiff};">▌ Difference: ${Number(differenceValue).toFixed(2)}${unit}</div>`
+                  : ''
+              }
             </div>
           `;
         },

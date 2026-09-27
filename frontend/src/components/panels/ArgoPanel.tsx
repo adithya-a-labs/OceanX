@@ -89,13 +89,13 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
             <h3 className="text-sm font-medium text-text-secondary mb-3">
               Profile ({argoProfile?.variable || 'temperature'})
             </h3>
-            <div className="h-[140px]" aria-label="Profile chart placeholder">
+            <div className="h-[120px]" aria-label="Profile chart placeholder">
               {isLoading ? (
                 <Skeleton variant="chart" className="h-full" />
               ) : argoProfile ? (
                 <ComparisonChart
                   data={argoProfile}
-                  height={140}
+                  height={120}
                   showDifference={false}
                   compact
                 />
@@ -113,10 +113,10 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
               <h3 className="text-sm font-medium text-text-secondary mb-3">
                 Model vs Observation
               </h3>
-              <div className="h-[180px]" aria-label="Comparison chart">
+              <div className="h-[200px]" aria-label="Comparison chart">
                 <ComparisonChart
                   data={argoProfile}
-                  height={180}
+                  height={200}
                   showDifference={true}
                 />
               </div>
