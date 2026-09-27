@@ -67,8 +67,15 @@ export const ComparisonChart = ({
 
     const hasDifference = showDifference && displayDifference.length > 0;
     const depthMax = Math.max(...displayDepth) * 1.05;
-    const valueMin = Math.min(...displayObserved, ...displayModel) * 0.95;
-    const valueMax = Math.max(...displayObserved, ...displayModel) * 1.05;
+
+    // Pad by the data range rather than scaling the extremes: scaling breaks for
+    // negative values, where min * 0.95 moves the bound toward zero and pushes
+    // the data point itself off the axis.
+    const valueLow = Math.min(...displayObserved, ...displayModel);
+    const valueHigh = Math.max(...displayObserved, ...displayModel);
+    const valuePad = (valueHigh - valueLow) * 0.08 || 1;
+    const valueMin = valueLow - valuePad;
+    const valueMax = valueHigh + valuePad;
 
     const xAxis: any[] = [];
     const yAxis: any[] = [];
@@ -260,19 +267,22 @@ export const ComparisonChart = ({
         borderWidth: 1,
         textStyle: { color: c.text.primary },
         formatter: (params: any) => {
-          // With two value axes on one axis trigger, params[0] is whichever
-          // series ECharts happens to order first. Look each one up by name.
+          // The axis trigger only collects series belonging to the grid the
+          // pointer is in. Hovering the difference strip therefore omits Observed
+          // and Model entirely, so reading a row out of one fixed param would
+          // mix depths. All three series are built from the same reversed depth
+          // order, so whichever series is present pins the shared index, and
+          // every value is then read from that one row.
           const list = Array.isArray(params) ? params : [params];
           const pick = (name: string) => list.find((p: any) => p.seriesName === name);
-          const observedPoint = pick('Observed');
-          const modelPoint = pick('Model');
-          const differencePoint = pick('Difference');
+          const anchor = pick('Difference') ?? pick('Observed') ?? pick('Model');
+          if (!anchor) return '';
 
-          const index = observedPoint?.dataIndex ?? modelPoint?.dataIndex ?? 0;
-          const paramDepth = observedPoint?.value?.[1] ?? modelPoint?.value?.[1] ?? 0;
-          const observedValue = observedPoint?.value?.[0] ?? displayObserved[index];
-          const modelValue = modelPoint?.value?.[0] ?? displayModel[index];
-          const differenceValue = differencePoint?.value?.[0] ?? displayDifference[index];
+          const index = anchor.dataIndex ?? 0;
+          const paramDepth = Number(displayDepth[index] ?? 0);
+          const observedValue = displayObserved[index];
+          const modelValue = displayModel[index];
+          const differenceValue = displayDifference[index];
 
           return `
             <div style="padding: 4px 0;">
