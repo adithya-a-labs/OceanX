@@ -218,10 +218,18 @@
   );
 }
 
+/*
+ * The submission build is authored at 1920x1080, so the recording size stays a
+ * hard cap. Pinning the root to a fixed 1920x1080 instead made every pinned
+ * panel resolve its `bottom` against 1080px, which pushed the charts and the
+ * status bar below the fold in any shorter window. Below the cap the root now
+ * tracks the viewport, and the panels scroll internally rather than clipping.
+ */
 @utility recording-viewport {
-  width: 1920px;
-  height: 1080px;
+  width: 100%;
   max-width: 1920px;
+  height: 100vh;
+  height: 100dvh;
   max-height: 1080px;
 }
 

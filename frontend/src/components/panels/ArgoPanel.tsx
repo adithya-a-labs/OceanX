@@ -37,7 +37,7 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className={`argo-panel ${className}`}
       >
-        <div className="h-full p-5 space-y-4">
+        <div className="h-full p-4 space-y-3">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
@@ -55,8 +55,8 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
 
           {/* Metadata Card */}
           <Card padding="md">
-            <h3 className="text-sm font-medium text-text-secondary mb-4">Metadata</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-sm font-medium text-text-secondary mb-3">Metadata</h3>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-text-muted">Latitude</p>
                 <p className="font-mono text-text-primary">
@@ -89,13 +89,13 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
             <h3 className="text-sm font-medium text-text-secondary mb-3">
               Profile ({argoProfile?.variable || 'temperature'})
             </h3>
-            <div className="h-[150px]" aria-label="Profile chart placeholder">
+            <div className="h-[140px]" aria-label="Profile chart placeholder">
               {isLoading ? (
                 <Skeleton variant="chart" className="h-full" />
               ) : argoProfile ? (
                 <ComparisonChart
                   data={argoProfile}
-                  height={150}
+                  height={140}
                   showDifference={false}
                   compact
                 />
@@ -113,10 +113,10 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
               <h3 className="text-sm font-medium text-text-secondary mb-3">
                 Model vs Observation
               </h3>
-              <div className="h-[200px]" aria-label="Comparison chart">
+              <div className="h-[180px]" aria-label="Comparison chart">
                 <ComparisonChart
                   data={argoProfile}
-                  height={200}
+                  height={180}
                   showDifference={true}
                 />
               </div>
