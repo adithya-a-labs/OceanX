@@ -5,7 +5,7 @@ import { ComparisonChart } from './ComparisonChart';
 import { InsightCard } from './InsightCard';
 import { formatCoordinate } from '../../utils/formatters';
 import type { ArgoComparison } from '../../types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 
 interface ArgoPanelProps {
   className?: string;
@@ -16,8 +16,14 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
   const profile = useOceanStore((s) => s.argoComparison);
   const isLoading = useOceanStore((s) => s.isComparisonLoading);
   const clearSelection = useOceanStore((s) => s.setSelectedArgoId);
+  const prefersReducedMotion = useReducedMotion();
 
   if (!selectedArgoId) return null;
+
+  // Honour the OS reduced-motion setting: fade only, no sliding.
+  const hidden = prefersReducedMotion
+    ? { opacity: 0 }
+    : { x: '100%', opacity: 0 };
 
   const argoProfile = profile as ArgoComparison | null;
   const isComparison = !!argoProfile;
@@ -25,9 +31,9 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        initial={{ x: '100%', opacity: 0 }}
+        initial={hidden}
         animate={{ x: 0, opacity: 1 }}
-        exit={{ x: '100%', opacity: 0 }}
+        exit={hidden}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className={`argo-panel ${className}`}
       >
