@@ -49,6 +49,7 @@ export interface GlobeConfig {
 export interface GlobeInstance {
   dispose: () => void;
   setCamera: (camera: Partial<CameraState>) => void;
+  flyToBayOfBengal?: (duration?: number) => void;
   setVariable: (variable: OceanVariable) => void;
   setDepth: (depth: number) => void;
   setTime: (time: string) => void;

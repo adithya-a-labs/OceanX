@@ -1,10 +1,9 @@
 import { useOceanStore } from '../../store';
 import { ControlPanel } from './ControlPanel';
-import { ArgoPanel } from '../panels/ArgoPanel';
-import { Icons } from '../ui/Icon';
-import { Icon } from '../ui/Icon';
+import { ArgoPanel, RecentArgoFloats } from '../panels';
+import { Icons, Icon } from '../ui/Icon';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useState } from 'react';
+import { useCallback } from 'react';
 
 export const MainLayout = () => {
   const selectedArgoId = useOceanStore((s) => s.selectedArgoId);
@@ -13,11 +12,29 @@ export const MainLayout = () => {
   const error = useOceanStore((s) => s.error);
   const setError = useOceanStore((s) => s.setError);
   const prefersReducedMotion = useReducedMotion();
-  const [controlPanelCollapsed, setControlPanelCollapsed] = useState(false);
+
+  // Quick camera presets
+  const handleFlyToBayOfBengal = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.__OCEANX_GLOBE_INSTANCE__?.flyToBayOfBengal?.(2.0);
+    }
+  }, []);
+
+  const handleGlobalOrbit = useCallback(() => {
+    if (typeof window !== 'undefined' && window.__OCEANX_GLOBE_INSTANCE__) {
+      window.__OCEANX_GLOBE_INSTANCE__.setCamera({
+        longitude: 78.0,
+        latitude: 12.0,
+        zoom: 3.5,
+        bearing: 0,
+        pitch: -88,
+      });
+    }
+  }, []);
 
   return (
-    <div className="recording-viewport relative bg-background overflow-hidden">
-      {/* Globe Canvas - KKJ mounts Three.js here */}
+    <div className="recording-viewport relative bg-background overflow-hidden select-none">
+      {/* Globe Canvas - Cesium 3D Engine mounts here */}
       <div
         id="globe-canvas"
         className="globe-canvas"
@@ -26,24 +43,16 @@ export const MainLayout = () => {
         aria-label="3D Ocean Globe"
       />
 
-      {/* Control Panel - Left sidebar with collapse */}
-      {!controlPanelCollapsed && <ControlPanel />}
-      <button
-        type="button"
-        className={`absolute left-2 top-[88px] z-panels p-1.5 rounded-md bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors cursor-pointer ${
-          controlPanelCollapsed ? 'rotate-180' : ''
-        }`}
-        onClick={() => setControlPanelCollapsed(!controlPanelCollapsed)}
-        aria-label={controlPanelCollapsed ? 'Expand control panel' : 'Collapse control panel'}
-        aria-expanded={!controlPanelCollapsed}
-      >
-        <Icon name={Icons.ChevronLeft} size={16} />
-      </button>
+      {/* Control Panel - Left sidebar with spring taskbar minimization */}
+      <ControlPanel />
 
-      {/* Argo Panel - Right sidebar (slide-in) */}
+      {/* Argo Float Details Panel - Right sidebar */}
       <AnimatePresence mode="wait">
         {selectedArgoId && <ArgoPanel />}
       </AnimatePresence>
+
+      {/* Recent Argo Floats Floating Dock */}
+      <RecentArgoFloats />
 
       {/* Global error banner */}
       <AnimatePresence>
@@ -55,7 +64,7 @@ export const MainLayout = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={prefersReducedMotion ? { opacity: 0 } : { y: -12, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute top-[84px] left-1/2 -translate-x-1/2 z-panels flex items-center gap-2 max-w-lg px-4 py-2.5 rounded-md bg-surface border border-error"
+            className="absolute top-[76px] left-1/2 -translate-x-1/2 z-panels flex items-center gap-2 max-w-lg px-4 py-2.5 rounded-md bg-surface border border-error shadow-2xl"
           >
             <Icon name={Icons.AlertCircle} size={16} className="text-error shrink-0" />
             <span className="text-sm text-text-primary">{error}</span>
@@ -72,37 +81,69 @@ export const MainLayout = () => {
         )}
       </AnimatePresence>
 
-      {/* No-selection hint: the Argo panel is selected-only, so say so up front */}
+      {/* Hint badge when no float is currently selected */}
       <AnimatePresence>
-        {!selectedArgoId && !controlPanelCollapsed && (
+        {!selectedArgoId && (
           <motion.div
             initial={prefersReducedMotion ? { opacity: 0 } : { x: 24, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { x: -24, opacity: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { x: 24, opacity: 0 }}
             transition={{ duration: 0.25 }}
             style={{ zIndex: 'var(--z-panels)' }}
-            className="absolute right-6 top-[88px] panel-flat flex items-center gap-2 py-2 pl-3 pr-4 rounded-md pointer-events-none select-none"
+            className="absolute right-6 top-[76px] panel-flat flex items-center gap-2.5 py-2 px-3 rounded-md pointer-events-none select-none border border-border"
           >
-            <Icon name={Icons.MapPin} size={14} className="text-primary shrink-0" />
-            <span className="text-xs text-text-secondary">
-              Select a float to inspect its profile
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            </span>
+            <span className="text-xs font-medium text-text-secondary">
+              Select an Argo float marker to inspect
             </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Minimal top bar - only error handling */}
-      <header className="absolute top-0 left-0 right-0 h-[72px] z-modals px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="font-display text-xl font-bold text-text-primary">OceanX</h1>
+      {/* Simplified Clean Header: OceanX Brand + Presets Only */}
+      <header className="absolute top-0 left-0 right-0 h-[60px] z-modals px-6 flex items-center justify-between border-b border-border bg-surface">
+        <h1 className="font-display text-xl font-bold text-text-primary tracking-tight">
+          OceanX
+        </h1>
+
+        <div className="flex items-center gap-1 bg-surface-elevated border border-border rounded-md p-1">
+          <button
+            type="button"
+            onClick={handleFlyToBayOfBengal}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors cursor-pointer"
+            title="Focus camera on Bay of Bengal demo region"
+          >
+            <Icon name={Icons.MapPin} size={13} className="text-primary" />
+            <span>Bay of Bengal</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleGlobalOrbit}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors cursor-pointer"
+            title="Switch to Global Earth orbit camera"
+          >
+            <Icon name={Icons.Globe} size={13} className="text-text-muted" />
+            <span>Orbit View</span>
+          </button>
         </div>
       </header>
 
-      {/* Bottom status bar - minimal */}
-      <footer className="absolute bottom-0 left-0 right-0 h-[48px] z-modals px-6 flex items-center border-t border-border bg-surface">
-        <div className="flex w-full items-center justify-between text-xs text-text-secondary">
-          <span>{manifest?.region.name ?? 'Bay of Bengal'} · {manifest?.region.south ?? 10}°N–{manifest?.region.north ?? 20}°N, {manifest?.region.west ?? 80}°E–{manifest?.region.east ?? 92}°E</span>
-          <span>OceanX v0.1.0</span>
+      {/* Footer Status Bar */}
+      <footer className="absolute bottom-0 left-0 right-0 h-[44px] z-modals px-6 flex items-center border-t border-border bg-surface">
+        <div className="flex w-full items-center justify-between text-xs font-mono text-text-muted">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <Icon name={Icons.Map} size={13} className="text-primary" />
+              {manifest?.region.name ?? 'Bay of Bengal'} ({manifest?.region.south ?? 10}°N–{manifest?.region.north ?? 20}°N, {manifest?.region.west ?? 80}°E–{manifest?.region.east ?? 92}°E)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="text-text-primary font-semibold">OceanX v0.1.0</span>
+          </div>
         </div>
       </footer>
     </div>
