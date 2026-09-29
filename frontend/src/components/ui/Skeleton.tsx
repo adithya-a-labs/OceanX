@@ -15,12 +15,12 @@ export const Skeleton = ({
   ...props
 }: SkeletonProps) => {
   const variantStyles: Record<string, { width?: string; height?: string; borderRadius?: string }> = {
-    text: { height: '1rem', borderRadius: '4px' },
-    card: { height: '8rem', borderRadius: '12px' },
-    chart: { height: '16rem', borderRadius: '12px' },
+    text: { height: '1rem', borderRadius: '2px' },
+    card: { height: '8rem', borderRadius: '6px' },
+    chart: { height: '16rem', borderRadius: '6px' },
     globe: { width: '100%', height: '100%', borderRadius: '0' },
     circle: { borderRadius: '9999px' },
-    rect: { borderRadius: '8px' },
+    rect: { borderRadius: '4px' },
   };
 
   const vStyle = variantStyles[variant] || variantStyles.rect;

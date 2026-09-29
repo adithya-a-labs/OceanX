@@ -2,80 +2,101 @@
  * OceanX Design Tokens
  * Single source of truth for all design decisions
  * Used by Tailwind CSS v4 (CSS-first) and TypeScript components
+ *
+ * The palette is a flat, near-black instrument surface. Depth is expressed with
+ * surface elevation and hairline borders rather than translucency, blur, or
+ * gradient fills, and the only accent hue is a single blue. Data series use the
+ * semantic status colours, which are functional (observed vs model, positive vs
+ * negative difference) and never decorative.
  */
 
 export const oceanTokens = {
   colors: {
-    // Ocean palette - core brand colors
+    // Neutral instrument ramp. Kept so `ocean-*` utilities and the
+    // OceanColorScale type stay available; it is no longer a blue theme scale.
     ocean: {
-      50: '#f0f9ff',
-      100: '#e0f2fe',
-      200: '#bae6fd',
-      300: '#7dd3fc',
-      400: '#38bdf8',
-      500: '#0ea5e9',
-      600: '#0284c7',
-      700: '#0369a1',
-      800: '#075985',
-      900: '#0c4a6e',
-      950: '#082f49',
+      50: '#f5f7f8',
+      100: '#e2e6e9',
+      200: '#b7bec5',
+      300: '#9aa3ab',
+      400: '#7f8992',
+      500: '#69737b',
+      600: '#525c64',
+      700: '#3d454c',
+      800: '#2a3036',
+      900: '#1b2024',
+      950: '#080a0c',
     },
     // Semantic aliases for consistent usage
     primary: {
-      DEFAULT: '#0ea5e9',
-      foreground: '#ffffff',
-      hover: '#0284c7',
-      active: '#0369a1',
+      DEFAULT: '#2aafef',
+      foreground: '#05080a',
+      hover: '#1c93d0',
+      active: '#1579ad',
     },
     secondary: {
-      DEFAULT: '#0284c7',
-      foreground: '#ffffff',
-      hover: '#0369a1',
-      active: '#075985',
+      DEFAULT: '#12161a',
+      foreground: '#f5f7f8',
+      hover: '#171c21',
+      active: '#0d1013',
     },
+    // One accent only: the same blue as primary. Callers that still read
+    // `accent` keep working and cannot reintroduce a second hue.
     accent: {
-      DEFAULT: '#f97316',
-      foreground: '#ffffff',
-      hover: '#ea580c',
-      active: '#c2410c',
+      DEFAULT: '#2aafef',
+      foreground: '#05080a',
+      hover: '#1c93d0',
+      active: '#1579ad',
     },
-    // Surface colors for recording-ready dark theme
-    background: '#082f49',
-    surface: '#0c4a6e',
-    surfaceHover: '#075985',
-    border: '#1e3a5f',
-    borderHover: '#38bdf8',
+    // Surface colors for the flat dark instrument theme
+    background: '#080a0c',
+    surface: '#0d1013',
+    surfaceElevated: '#12161a',
+    surfaceHover: '#171c21',
+    border: '#252b31',
+    borderHover: '#343b42',
     // Text colors
     text: {
-      primary: '#f0f9ff',
-      secondary: '#bae6fd',
-      muted: '#7dd3fc',
-      inverse: '#082f49',
+      primary: '#f5f7f8',
+      secondary: '#b7bec5',
+      muted: '#7f8992',
+      inverse: '#080a0c',
     },
-    // Variable-specific color scales
+    // Variable-specific scales. `swatches` are discrete solid colours: the
+    // legend renders them as separate blocks rather than interpolating between
+    // them, so nothing in the UI depends on a gradient.
     temperature: {
-      gradient: ['#0ea5e9', '#f97316', '#ef4444'],
+      swatches: ['#1d4e89', '#2aafef', '#e0a03c', '#d9534f'],
       unit: '°C',
-      minColor: '#0ea5e9',
-      maxColor: '#ef4444',
+      minColor: '#1d4e89',
+      maxColor: '#d9534f',
     },
     salinity: {
-      gradient: ['#0ea5e9', '#22d3ee', '#a5f3fc'],
+      swatches: ['#24406e', '#3c7fb8', '#57b7c4', '#a5d8c9'],
       unit: 'PSU',
-      minColor: '#0ea5e9',
-      maxColor: '#a5f3fc',
+      minColor: '#24406e',
+      maxColor: '#a5d8c9',
     },
     currents: {
-      gradient: ['#22d3ee', '#0ea5e9', '#0284c7'],
+      swatches: ['#123f4f', '#1f7a96', '#2aafef', '#7fdcc0'],
       unit: 'm/s',
-      minColor: '#22d3ee',
-      maxColor: '#0284c7',
+      minColor: '#123f4f',
+      maxColor: '#7fdcc0',
     },
+    // Data-series colours. Observed/model and positive/negative difference need
+    // to be told apart at a glance, so these are functional, not accent chrome.
+    observed: '#2aafef',
+    model: '#d9a441',
     // Status colors
-    success: '#22c55e',
-    warning: '#fbbf24',
-    error: '#ef4444',
-    info: '#38bdf8',
+    success: '#3fb950',
+    warning: '#d9a441',
+    error: '#e5484d',
+    /** Lightened for text/icon use: #e5484d is only 4.3:1 on the panel surface. */
+    errorBright: '#ff9a9e',
+    info: '#2aafef',
+    /** Chart chrome */
+    gridline: '#1b2024',
+    overlay: 'rgba(13, 16, 19, 0.98)',
   },
   spacing: {
     // 4px base scale
@@ -128,30 +149,28 @@ export const oceanTokens = {
     },
   },
   shadows: {
-    // Elevation system for panels, modals, globe overlay
-    1: '0 1px 2px 0 rgb(0 0 0 / 0.3)',
-    2: '0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3)',
-    3: '0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3)',
-    4: '0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4)',
-    5: '0 25px 50px -12px rgb(0 0 0 / 0.6)',
-    // Special shadows
-    glow: '0 0 20px rgb(14 165 233 / 0.3)',
-    glowStrong: '0 0 40px rgb(14 165 233 / 0.5)',
-    inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.4)',
+    // Flat surfaces rely on a 1px border, not a drop shadow. These are kept only
+    // for true overlays (menus, banners) that sit above the globe canvas.
+    1: '0 1px 2px 0 rgb(0 0 0 / 0.5)',
+    2: '0 4px 8px -2px rgb(0 0 0 / 0.55)',
+    3: '0 8px 24px -6px rgb(0 0 0 / 0.6)',
+    4: '0 16px 32px -8px rgb(0 0 0 / 0.65)',
+    5: '0 24px 48px -12px rgb(0 0 0 / 0.7)',
+    inner: 'inset 0 1px 0 0 rgb(255 255 255 / 0.03)',
   },
   borderRadius: {
     none: '0',
-    sm: '4px',
-    md: '8px',
-    lg: '12px',
-    xl: '16px',
-    '2xl': '24px',
+    sm: '2px',
+    md: '4px',
+    lg: '6px',
+    xl: '8px',
+    '2xl': '12px',
     full: '9999px',
   },
   transitions: {
-    fast: '150ms cubic-bezier(0.4, 0, 0.2, 1)',
-    normal: '250ms cubic-bezier(0.4, 0, 0.2, 1)',
-    slow: '350ms cubic-bezier(0.4, 0, 0.2, 1)',
+    fast: '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+    normal: '180ms cubic-bezier(0.4, 0, 0.2, 1)',
+    slow: '280ms cubic-bezier(0.4, 0, 0.2, 1)',
     spring: '400ms cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
   zIndex: {

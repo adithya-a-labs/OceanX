@@ -69,7 +69,7 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
           exit={{ x: 40, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           style={{ zIndex: 'var(--z-panels)' }}
-          className="absolute right-6 top-[88px] glass-panel flex flex-col items-center py-3 px-2 rounded-xl border border-border shadow-lg cursor-pointer hover:border-primary/60 transition-colors"
+          className="absolute right-6 top-[88px] panel-flat flex flex-col items-center py-3 px-2 rounded-md cursor-pointer hover:border-primary transition-colors"
           onClick={() => setIsMinimized(false)}
           role="button"
           tabIndex={0}
@@ -83,14 +83,14 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
               e.stopPropagation();
               setIsMinimized(false);
             }}
-            className="p-1.5 rounded-lg text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-primary hover:bg-surface-hover transition-colors cursor-pointer"
             title="Expand panel"
             aria-label="Expand panel"
           >
             <Icon name={Icons.ChevronLeft} size={18} />
           </button>
 
-          <div className="my-2 p-1.5 rounded-full bg-accent/20 text-accent">
+          <div className="my-2 p-1.5 rounded-md bg-surface border border-border text-primary">
             <Icon name={Icons.MapPin} size={16} />
           </div>
 
@@ -153,7 +153,7 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
             {isObservationError ? (
               <Card padding="md" role="alert">
                 <div className="flex items-start gap-2">
-                  <Icon name={Icons.AlertCircle} size={16} className="mt-0.5 text-danger shrink-0" />
+                  <Icon name={Icons.AlertCircle} size={16} className="mt-0.5 text-error-bright shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-text-primary">Could not load this float</p>
                     <p className="mt-1 text-xs text-text-muted">

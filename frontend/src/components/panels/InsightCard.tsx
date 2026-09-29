@@ -53,12 +53,16 @@ export const InsightCard = ({ observationId, comparison }: InsightCardProps) => 
   const trend = avgDiff > 0 ? 'up' as const : avgDiff < 0 ? 'down' as const : 'stable' as const;
   const trendIcon =
     trend === 'up' ? Icons.TrendingUp : trend === 'down' ? Icons.TrendingDown : Icons.Activity;
-  const severityColor = trend === 'stable' ? 'text-info' : 'text-primary';
+  // "Stable" is the absence of a signal, so it reads as muted text rather than
+  // spending the accent hue on a label.
+  const severityColor = trend === 'stable' ? 'text-text-muted' : 'text-text-primary';
 
   return (
-    <Card padding="md" className="border-l-4 border-l-primary">
+    <Card padding="md" className="border-l-2 border-l-primary">
       <div className="flex items-start gap-3">
-        <div className={`flex-shrink-0 p-2 rounded-lg bg-primary/10 ${severityColor}`}>
+        <div
+          className={`flex-shrink-0 p-2 rounded-md bg-surface-elevated border border-border ${severityColor}`}
+        >
           <Icon name={trendIcon} size={20} />
         </div>
         <div className="flex-1 min-w-0">
@@ -66,7 +70,7 @@ export const InsightCard = ({ observationId, comparison }: InsightCardProps) => 
             <h4 className="font-semibold text-text-primary">Largest paired difference</h4>
             {Number.isFinite(rmse) && (
               <span
-                className="text-xs font-mono text-primary px-2 py-0.5 rounded bg-primary/10 whitespace-nowrap"
+                className="text-xs font-mono text-primary px-2 py-0.5 rounded-sm bg-surface-elevated border border-border whitespace-nowrap"
                 title={`${unit} root mean square error`}
               >
                 {formatRMSE(rmse, unit)}

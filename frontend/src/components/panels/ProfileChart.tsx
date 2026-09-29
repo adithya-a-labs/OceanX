@@ -16,9 +16,11 @@ interface ProfileChartProps {
 
 const c = oceanTokens.colors;
 
+// The profile chart draws a single observed Argo series, so both variables use
+// the same functional observed colour rather than a per-variable hue.
 const SERIES_COLORS: Record<LayerVariable, string> = {
-  temperature: c.accent.DEFAULT,
-  salinity: c.salinity.gradient[1],
+  temperature: c.observed,
+  salinity: c.observed,
 };
 
 const VARIABLE_LABELS: Record<LayerVariable, string> = {

@@ -1,12 +1,16 @@
 import { useOceanStore } from '../../store';
 import { Icons } from '../ui/Icon';
 import { Icon } from '../ui/Icon';
-import type { OceanVariable } from '../../types';
+import type { LayerVariable } from '../../types/demoData';
 
+/**
+ * Gridded variables only. Currents is a velocity field rather than a gridded
+ * layer, and selecting it is owned by the Currents toggle in `LayerToggles` —
+ * offering it here as well let the two disagree about what the globe was showing.
+ */
 const VARIABLE_OPTIONS = [
   { value: 'temperature', label: 'Temperature', icon: Icons.Thermometer },
   { value: 'salinity', label: 'Salinity', icon: Icons.Droplet },
-  { value: 'currents', label: 'Currents', icon: Icons.Waves },
 ] as const;
 
 export const VariableSelector = () => {
@@ -15,21 +19,23 @@ export const VariableSelector = () => {
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide">
+      <span className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
         Variable
-      </label>
+      </span>
       <div className="flex gap-2">
         {VARIABLE_OPTIONS.map(({ value, label, icon }) => (
           <button
             key={value}
-            onClick={() => setVariable(value as OceanVariable)}
+            type="button"
+            onClick={() => setVariable(value as LayerVariable)}
             className={`
               flex-1 flex flex-col items-center gap-1.5 px-3 py-3
-              rounded-lg border-2 transition-all duration-200
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
-              ${variable === value
-                ? 'bg-primary/20 border-primary text-primary'
-                : 'bg-surface border-border text-text-secondary hover:border-border-hover hover:text-text-primary'
+              rounded-md border transition-colors duration-200
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
+              ${
+                variable === value
+                  ? 'bg-surface-elevated border-primary text-primary'
+                  : 'bg-surface border-border text-text-secondary hover:border-border-hover hover:text-text-primary'
               }
             `}
             aria-pressed={variable === value}

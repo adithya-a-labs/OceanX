@@ -54,15 +54,17 @@ export const ComparisonChart = ({
         .filter((pair): pair is readonly [number, number] => Number.isFinite(pair[0]))
       : [];
 
-    const observedColor = c.salinity.gradient[1]; // cyan
-    const modelColor = c.accent.DEFAULT; // orange
+    const observedColor = c.observed;
+    const modelColor = c.model;
     const positiveDiff = c.success;
     const negativeDiff = c.error;
     const axisLabelColor = c.text.muted;
-    const axisNameColor = c.ocean[200];
+    const axisNameColor = c.text.secondary;
     const axisLineColor = c.border;
-    const splitLineColor = 'rgba(30, 58, 95, 0.5)'; // 50% of colors.border
-    const surfaceTint = 'rgba(12, 74, 110, 0.95)'; // 95% of colors.surface
+    // Flat tokens instead of hand-tuned rgba: the zero/split line needs to read
+    // slightly stronger than the axis, so it uses the next border step.
+    const splitLineColor = c.borderHover;
+    const surfaceTint = c.overlay;
 
     const hasDifference = differencePairs.length > 0;
     const depthMax = Math.max(...displayDepth) * 1.05;
