@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "assetsReady": false,
+  "region": {
+    "name": "Bay of Bengal",
+    "south": 10,
+    "north": 20,
+    "west": 80,
+    "east": 92
+  },
+  "model": {
+    "provider": "Copernicus Marine",
+    "productId": "GLOBAL_MULTIYEAR_PHY_001_030",
+    "datasetId": "cmems_mod_glo_phy_my_0.083deg_P1D-m",
+    "datasetVersion": "202311",
+    "doi": "10.48670/moi-00021"
+  },
+  "plannedDates": [
+    "2025-04-20",
+    "2025-04-21",
+    "2025-04-22",
+    "2025-04-23"
+  ],
+  "times": [
+    {
+      "id": "t0",
+      "iso": "2025-04-20T00:00:00Z",
+      "status": "planned"
+    },
+    {
+      "id": "t1",
+      "iso": "2025-04-21T00:00:00Z",
+      "status": "planned"
+    },
+    {
+      "id": "t2",
+      "iso": "2025-04-22T00:00:00Z",
+      "status": "planned"
+    },
+    {
+      "id": "t3",
+      "iso": "2025-04-23T00:00:00Z",
+      "status": "planned"
+    }
+  ],
+  "depths": [
+    {
+      "id": "depth-0",
+      "requestedDepthM": 0,
+      "actualDepthM": 0.49402499198913574
+    },
+    {
+      "id": "depth-50",
+      "requestedDepthM": 50,
+      "actualDepthM": 47.37369155883789
+    },
+    {
+      "id": "depth-100",
+      "requestedDepthM": 100,
+      "actualDepthM": 92.3260726928711
+    },
+    {
+      "id": "depth-200",
+      "requestedDepthM": 200,
+      "actualDepthM": 186.12559509277344
+    },
+    {
+      "id": "depth-500",
+      "requestedDepthM": 500,
+      "actualDepthM": 541.0889282226562
+    }
+  ],
+  "variables": {
+    "temperature": {
+      "sourceVariable": "thetao",
+      "unit": "degrees_C",
+      "standardName": "sea_water_potential_temperature"
+    },
+    "salinity": {
+      "sourceVariable": "so",
+      "unit": "1e-3",
+      "standardName": "sea_water_salinity"
+    },
+    "u": {
+      "sourceVariable": "uo",
+      "unit": "m s-1",
+      "standardName": "eastward_sea_water_velocity"
+    },
+    "v": {
+      "sourceVariable": "vo",
+      "unit": "m s-1",
+      "standardName": "northward_sea_water_velocity"
+    }
+  },
+  "featuredArgoId": "5907082-059",
+  "argoIds": [
+    "5907082-059",
+    "1902669-059",
+    "2902766-196",
+    "7901125-059"
+  ],
+  "provenance": {
+    "model": "catalogue-verified; subset pending authentication",
+    "argo": "real Argo GDAC delayed-mode adjusted QC 1",
+    "insightText": "pending model comparison"
+  }
+}

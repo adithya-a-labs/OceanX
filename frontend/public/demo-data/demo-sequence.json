@@ -1,0 +1,46 @@
+{
+  "initial": {
+    "variable": "temperature",
+    "timeId": "t0",
+    "depthId": "depth-0"
+  },
+  "requiresModelAssets": true,
+  "ready": false,
+  "scenes": [
+    {
+      "id": "hero"
+    },
+    {
+      "id": "bay-zoom"
+    },
+    {
+      "id": "temperature"
+    },
+    {
+      "id": "depth-change",
+      "depthId": "depth-100"
+    },
+    {
+      "id": "time-change",
+      "timeId": "t2"
+    },
+    {
+      "id": "currents"
+    },
+    {
+      "id": "argo",
+      "observationId": "5907082-059"
+    },
+    {
+      "id": "comparison",
+      "observationId": "5907082-059"
+    },
+    {
+      "id": "insight",
+      "observationId": "5907082-059"
+    },
+    {
+      "id": "final-hero"
+    }
+  ]
+}

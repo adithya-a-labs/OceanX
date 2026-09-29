@@ -1,0 +1,50 @@
+[
+  {
+    "id": "5907082-059",
+    "platformId": "5907082",
+    "cycle": 59,
+    "latitude": 17.883333333333333,
+    "longitude": 85.96666666666667,
+    "time": "2025-04-20T14:13:45Z",
+    "maxDepthM": 1964.485,
+    "hasTemperature": true,
+    "hasSalinity": true,
+    "featured": true
+  },
+  {
+    "id": "1902669-059",
+    "platformId": "1902669",
+    "cycle": 59,
+    "latitude": 14.716666666666667,
+    "longitude": 86.31666666666666,
+    "time": "2025-04-21T14:16:21Z",
+    "maxDepthM": 2003.988,
+    "hasTemperature": true,
+    "hasSalinity": true,
+    "featured": false
+  },
+  {
+    "id": "2902766-196",
+    "platformId": "2902766",
+    "cycle": 196,
+    "latitude": 14.635,
+    "longitude": 87.225,
+    "time": "2025-04-22T11:36:19Z",
+    "maxDepthM": 1959.285,
+    "hasTemperature": true,
+    "hasSalinity": true,
+    "featured": false
+  },
+  {
+    "id": "7901125-059",
+    "platformId": "7901125",
+    "cycle": 59,
+    "latitude": 13.816666666666666,
+    "longitude": 90.46666666666667,
+    "time": "2025-04-22T14:12:48Z",
+    "maxDepthM": 1987.424,
+    "hasTemperature": true,
+    "hasSalinity": true,
+    "featured": false
+  }
+]
