@@ -5,6 +5,8 @@ import { ComparisonChart } from './ComparisonChart';
 import { InsightCard } from './InsightCard';
 import { formatCoordinate } from '../../utils/formatters';
 import type { ArgoComparison } from '../../types';
+import { useQuery } from '@tanstack/react-query';
+import { getArgoProfile } from '../../data';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 
 interface ArgoPanelProps {
@@ -13,6 +15,12 @@ interface ArgoPanelProps {
 
 export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
   const selectedArgoId = useOceanStore((s) => s.selectedArgoId);
+  const modelReady = useOceanStore((s) => s.manifest?.assetsReady ?? false);
+  const { data: observation } = useQuery({
+    queryKey: ['argoProfile', selectedArgoId],
+    queryFn: () => getArgoProfile(selectedArgoId!),
+    enabled: !!selectedArgoId,
+  });
   const profile = useOceanStore((s) => s.argoComparison);
   const isLoading = useOceanStore((s) => s.isComparisonLoading);
   const clearSelection = useOceanStore((s) => s.setSelectedArgoId);
@@ -27,6 +35,7 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
 
   const argoProfile = profile as ArgoComparison | null;
   const isComparison = !!argoProfile;
+  const displayProfile = argoProfile ?? observation;
 
   return (
     <AnimatePresence mode="wait">
@@ -60,19 +69,19 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
               <div>
                 <p className="text-xs text-text-muted">Latitude</p>
                 <p className="font-mono text-text-primary">
-                  {argoProfile ? formatCoordinate(argoProfile.latitude, true) : '—'}
+                  {displayProfile ? formatCoordinate(displayProfile.latitude, true) : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-text-muted">Longitude</p>
                 <p className="font-mono text-text-primary">
-                  {argoProfile ? formatCoordinate(argoProfile.longitude, false) : '—'}
+                  {displayProfile ? formatCoordinate(displayProfile.longitude, false) : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-text-muted">Time</p>
                 <p className="font-mono text-text-primary">
-                  {argoProfile ? new Date(argoProfile.time).toLocaleString() : '—'}
+                  {displayProfile ? new Date(displayProfile.time).toLocaleString() : '—'}
                 </p>
               </div>
               <div>
@@ -101,11 +110,31 @@ export const ArgoPanel = ({ className = '' }: ArgoPanelProps) => {
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-text-secondary">
-                  No profile data available
+                  {observation ? 'Observation values shown below' : 'Loading observation…'}
                 </div>
               )}
             </div>
           </Card>
+
+          {!modelReady && observation && (
+            <Card padding="md">
+              <p className="text-sm text-text-secondary">
+                Real Argo delayed-mode profile · adjusted QC 1 · {observation.depthM.at(-1)?.toFixed(0)} m maximum depth
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-xs text-text-secondary">
+                <span>Depth</span><span>Temp</span><span>Salinity</span>
+                {observation.depthM.filter((_, i) => i % Math.max(1, Math.floor(observation.depthM.length / 6)) === 0).map(depth => {
+                  const i = observation.depthM.indexOf(depth);
+                  return <div className="col-span-3 grid grid-cols-3" key={i}>
+                    <span>{depth.toFixed(0)} m</span>
+                    <span>{observation.temperatureDegC[i].toFixed(2)} °C</span>
+                    <span>{observation.salinity[i]?.toFixed(2) ?? '—'}</span>
+                  </div>;
+                })}
+              </div>
+              <p className="mt-3 text-xs text-text-muted">Model comparison awaits Copernicus data export.</p>
+            </Card>
+          )}
 
           {/* Comparison Chart (if available) */}
           {isComparison && (

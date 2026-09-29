@@ -4,6 +4,7 @@
 
 export * from './ocean';
 export * from './argo';
+export * from './demoData';
 export type {
   GlobeEvents,
   GlobeConfig,

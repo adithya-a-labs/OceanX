@@ -2,9 +2,13 @@ import { useEffect, useCallback } from 'react';
 import { useOceanStore } from './store';
 import { MainLayout } from './components/layout';
 import { useGlobeBridge, useGlobeSync } from './hooks/useArgoSelection';
-import { createMockDemoDataHelpers } from './utils/demoData';
+import { demoDataHelpers } from './data/legacyAdapter';
+import { demoDataBasePath, loadDemoManifest } from './data/demoData';
+import { preloadNearbyFrames } from './data/preload';
 import { setDemoDataHelpers } from './hooks/useOceanData';
 import type { OceanVariable, InitializeGlobe, GlobeInstance, ArgoMarker } from './types';
+
+setDemoDataHelpers(demoDataHelpers);
 
 // Extend Window type for globe integration
 declare global {
@@ -29,11 +33,45 @@ function OceanXApp() {
   const setGlobeReady = useOceanStore((s) => s.setGlobeReady);
   const setIsLoadingOceanSlice = useOceanStore((s) => s.setIsLoadingOceanSlice);
   const setIsLoadingArgoProfiles = useOceanStore((s) => s.setIsLoadingArgoProfiles);
+  const selectedArgoId = useOceanStore((s) => s.selectedArgoId);
+  const modelReady = useOceanStore((s) => s.manifest?.assetsReady ?? false);
 
-  // Initialize demo data helpers (Prabhu will replace with real implementation)
+  // Register the typed local-data adapter, then hydrate shared IDs from the manifest.
   useEffect(() => {
-    setDemoDataHelpers(createMockDemoDataHelpers());
+    let active = true;
+    loadDemoManifest().then(manifest => {
+      if (active) useOceanStore.getState().initializeFromManifest(manifest);
+    }).catch(error => useOceanStore.getState().setError(String(error)));
+    return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const warm = () => {
+      const state = useOceanStore.getState();
+      if (state.manifest && state.variable !== 'currents') {
+        void preloadNearbyFrames(state.manifest, state.variable, state.depthId, state.timeId);
+      }
+    };
+    warm();
+    return useOceanStore.subscribe(warm);
+  }, []);
+
+  // Selection from either the globe or dashboard drives the same comparison panel.
+  useEffect(() => {
+    if (!selectedArgoId || !modelReady) return;
+    let active = true;
+    useOceanStore.getState().setIsComparisonLoading(true);
+    demoDataHelpers.getComparison(selectedArgoId).then(comparison => {
+      if (active && useOceanStore.getState().selectedArgoId === selectedArgoId) {
+        useOceanStore.getState().setArgoComparison(comparison);
+      }
+    }).catch(error => {
+      if (active) useOceanStore.getState().setError(String(error));
+    }).finally(() => {
+      if (active) useOceanStore.getState().setIsComparisonLoading(false);
+    });
+    return () => { active = false; };
+  }, [selectedArgoId, modelReady]);
 
   // Initialize globe bridge (KKJ will provide __OCEANX_GLOBE_INIT__)
   useGlobeBridge();
@@ -106,14 +144,13 @@ function OceanXApp() {
             container,
             initialState,
             events,
-            demoDataPath: '/demo-data',
+            demoDataPath: demoDataBasePath,
           });
 
           window.__OCEANX_GLOBE_INSTANCE__ = globeInstance;
         } catch (error) {
           console.error('Failed to initialize globe:', error);
-          // Fallback: mark as ready anyway for UI development
-          handleGlobeReady();
+          useOceanStore.getState().setError(String(error));
         } finally {
           setIsLoadingOceanSlice(false);
           setIsLoadingArgoProfiles(false);
