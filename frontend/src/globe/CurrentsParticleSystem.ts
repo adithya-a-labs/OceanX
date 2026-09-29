@@ -17,6 +17,24 @@ interface Particle {
   speed: number;
 }
 
+/** Samples a nullable u/v grid. Missing values yield 0 rather than NaN. */
+function bilinear(
+  grid: (number | null)[][],
+  r0: number,
+  c0: number,
+  r1: number,
+  c1: number,
+  fx: number,
+  fy: number,
+): number {
+  const a = grid[r0][c0];
+  const b = grid[r0][c1];
+  const c = grid[r1][c0];
+  const d = grid[r1][c1];
+  if (a === null || b === null || c === null || d === null) return 0;
+  return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+}
+
 export class CurrentsParticleSystem {
   private viewer: Cesium.Viewer;
   private pointsCollection: Cesium.PointPrimitiveCollection | null = null;
@@ -131,19 +149,11 @@ export class CurrentsParticleSystem {
     const fx = gx - c0;
     const fy = gy - r0;
 
-    // Bilinear interpolation for u
-    const u00 = u[r0][c0];
-    const u10 = u[r0][c1];
-    const u01 = u[r1][c0];
-    const u11 = u[r1][c1];
-    const uInterp = (u00 * (1 - fx) + u10 * fx) * (1 - fy) + (u01 * (1 - fx) + u11 * fx) * fy;
-
-    // Bilinear interpolation for v
-    const v00 = v[r0][c0];
-    const v10 = v[r0][c1];
-    const v01 = v[r1][c0];
-    const v11 = v[r1][c1];
-    const vInterp = (v00 * (1 - fx) + v10 * fx) * (1 - fy) + (v01 * (1 - fx) + v11 * fx) * fy;
+    // Bilinear interpolation for u and v. A cell touching a missing value has no
+    // defined interpolation, so it samples as zero velocity and the particle
+    // stalls there rather than being given an invented direction.
+    const uInterp = bilinear(u, r0, c0, r1, c1, fx, fy);
+    const vInterp = bilinear(v, r0, c0, r1, c1, fx, fy);
 
     return { u: uInterp, v: vInterp };
   }

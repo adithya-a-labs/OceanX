@@ -8,18 +8,21 @@ import { useOceanStore } from '../store';
 import type { ArgoMarker } from '../types';
 
 /**
- * Hook for UI components to manage Argo selection
+ * Hook for UI components to manage Argo selection.
+ *
+ * All three entry points (control panel list, globe marker click, panel close
+ * button) resolve to the same two store actions, so there is exactly one
+ * selection transition to reason about.
  */
 export function useArgoSelection() {
   const selectedArgoId = useOceanStore((s) => s.selectedArgoId);
-  const argoComparison = useOceanStore((s) => s.argoComparison);
-  const isComparisonLoading = useOceanStore((s) => s.isComparisonLoading);
-  const setSelectedArgoId = useOceanStore((s) => s.setSelectedArgoId);
+  const selectArgoById = useOceanStore((s) => s.selectArgo);
   const clearSelectedArgo = useOceanStore((s) => s.clearSelectedArgo);
 
-  const selectArgo = useCallback((marker: ArgoMarker) => {
-    setSelectedArgoId(marker.id);
-  }, [setSelectedArgoId]);
+  const selectArgo = useCallback(
+    (marker: ArgoMarker) => selectArgoById(marker.id),
+    [selectArgoById],
+  );
 
   const clearSelection = useCallback(() => {
     clearSelectedArgo();
@@ -27,8 +30,6 @@ export function useArgoSelection() {
 
   return {
     selectedArgoId,
-    argoComparison,
-    isComparisonLoading,
     selectArgo,
     clearSelection,
     isSelected: !!selectedArgoId,

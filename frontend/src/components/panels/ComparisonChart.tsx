@@ -1,31 +1,10 @@
 import { useMemo } from 'react';
-import * as echarts from 'echarts/core';
-import { LineChart, BarChart } from 'echarts/charts';
-import {
-  TitleComponent,
-  TooltipComponent,
-  GridComponent,
-  LegendComponent,
-  DatasetComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
 import EChartsReact from 'echarts-for-react';
 import { useReducedMotion } from 'framer-motion';
+import echarts from '../charts/echartsSetup';
 import { oceanTokens } from '../../design-system';
+import { getUnit } from '../../utils/formatters';
 import type { ArgoComparison, AnimationEasing } from '../../types';
-
-// Register required ECharts components
-// Axis is built into echarts core, no need to import separately
-echarts.use([
-  LineChart,
-  BarChart,
-  TitleComponent,
-  TooltipComponent,
-  GridComponent,
-  LegendComponent,
-  DatasetComponent,
-  CanvasRenderer,
-]);
 
 const c = oceanTokens.colors;
 
@@ -47,7 +26,33 @@ export const ComparisonChart = ({
 
   const options = useMemo(() => {
     const { depth, observed, model, difference, variable } = data;
-    const unit = variable === 'salinity' ? 'PSU' : variable === 'temperature' ? '°C' : 'm/s';
+    const unit = getUnit(variable);
+
+    // Only keep levels where depth and both series are present and finite. A
+    // partially written asset would otherwise place NaN on the axis and collapse
+    // the whole plot, and an entirely empty series would produce -Infinity
+    // bounds that ECharts cannot render.
+    const rows = depth
+      .map((d, i) => ({ depth: d, observed: observed[i], model: model[i], difference: difference[i] }))
+      .filter(r =>
+        Number.isFinite(r.depth) &&
+        Number.isFinite(r.observed) &&
+        Number.isFinite(r.model));
+    if (rows.length === 0) return null;
+
+    const displayRows = [...rows].reverse(); // surface at top
+    const displayDepth = displayRows.map(r => r.depth);
+    const displayObserved = displayRows.map(r => r.observed as number);
+    const displayModel = displayRows.map(r => r.model as number);
+    // Difference stays index-aligned with the profile rows so the tooltip can
+    // read a matching depth; levels without a finite difference are dropped as
+    // value/depth pairs rather than as bare values, which would shift the bars
+    // off their depths.
+    const differencePairs = showDifference
+      ? displayRows
+        .map((r, i) => [r.difference, displayDepth[i]] as const)
+        .filter((pair): pair is readonly [number, number] => Number.isFinite(pair[0]))
+      : [];
 
     const observedColor = c.salinity.gradient[1]; // cyan
     const modelColor = c.accent.DEFAULT; // orange
@@ -59,13 +64,7 @@ export const ComparisonChart = ({
     const splitLineColor = 'rgba(30, 58, 95, 0.5)'; // 50% of colors.border
     const surfaceTint = 'rgba(12, 74, 110, 0.95)'; // 95% of colors.surface
 
-    // Reverse depth for display (surface at top)
-    const displayDepth = [...depth].reverse();
-    const displayObserved = [...observed].reverse();
-    const displayModel = [...model].reverse();
-    const displayDifference = showDifference ? [...difference].reverse() : [];
-
-    const hasDifference = showDifference && displayDifference.length > 0;
+    const hasDifference = differencePairs.length > 0;
     const depthMax = Math.max(...displayDepth) * 1.05;
 
     // Pad by the data range rather than scaling the extremes: scaling breaks for
@@ -150,7 +149,7 @@ export const ComparisonChart = ({
 
       // Symmetric around zero so the sign colours actually mean something, and
       // so the bars grow from a visible zero baseline.
-      const maxAbsDifference = Math.max(0, ...displayDifference.map((v) => Math.abs(v)));
+      const maxAbsDifference = Math.max(0, ...differencePairs.map(([v]) => Math.abs(v)));
       const differenceLimit = maxAbsDifference > 0 ? maxAbsDifference * 1.15 : 1;
 
       xAxis.push({
@@ -243,7 +242,7 @@ export const ComparisonChart = ({
       series.push({
         name: 'Difference',
         type: 'bar',
-        data: displayDifference.map((v, i) => [v, displayDepth[i]]),
+        data: differencePairs.map(([v, d]) => [v, d]),
         barWidth: '30%',
         itemStyle: {
           color: (params: any) => (params.value[0] >= 0 ? positiveDiff : negativeDiff),
@@ -282,7 +281,7 @@ export const ComparisonChart = ({
           const paramDepth = Number(displayDepth[index] ?? 0);
           const observedValue = displayObserved[index];
           const modelValue = displayModel[index];
-          const differenceValue = displayDifference[index];
+          const differenceValue = displayRows[index]?.difference;
 
           return `
             <div style="padding: 4px 0;">
@@ -290,7 +289,7 @@ export const ComparisonChart = ({
               <div style="color: ${observedColor};">● Observed: ${Number(observedValue).toFixed(2)}${unit}</div>
               <div style="color: ${modelColor};">○ Model: ${Number(modelValue).toFixed(2)}${unit}</div>
               ${
-                hasDifference
+                Number.isFinite(differenceValue)
                   ? `<div style="color: ${Number(differenceValue) >= 0 ? positiveDiff : negativeDiff};">▌ Difference: ${Number(differenceValue).toFixed(2)}${unit}</div>`
                   : ''
               }
@@ -313,6 +312,19 @@ export const ComparisonChart = ({
     };
   }, [data, height, showDifference, compact, animate]);
 
+  if (!options) {
+    return (
+      <div
+        className="h-full flex items-center justify-center text-sm text-text-muted"
+        role="status"
+      >
+        No comparable levels in this profile.
+      </div>
+    );
+  }
+
+  const rmseLabel = Number.isFinite(data.rmse) ? ` with RMSE ${data.rmse.toFixed(3)}` : '';
+
   return (
     <EChartsReact
       echarts={echarts}
@@ -321,7 +333,7 @@ export const ComparisonChart = ({
       opts={{ renderer: 'canvas' }}
       style={{ width: '100%', height }}
       role="img"
-      aria-label={`Comparison chart for ${data.variable} showing observed vs model with RMSE ${data.rmse.toFixed(3)}`}
+      aria-label={`Comparison chart for ${data.variable} showing observed vs model${rmseLabel}`}
     />
   );
 };

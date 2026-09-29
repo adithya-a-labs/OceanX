@@ -10,8 +10,6 @@ export {
   selectShowArgo,
   selectShowCurrents,
   selectSelectedArgoId,
-  selectArgoComparison,
-  selectIsComparisonLoading,
   selectCamera,
   selectIsGlobeReady,
   selectBounds,
