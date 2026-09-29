@@ -1,0 +1,13 @@
+{
+  "variable": "temperature",
+  "depth": 50,
+  "time": "2026-09-24T12:00:00Z",
+  "data": [],
+  "bounds": { "north": 18, "south": 12, "east": 90, "west": 82 },
+  "metadata": {
+    "min": 26.5,
+    "max": 28.5,
+    "unit": "°C",
+    "colorScale": ["#0ea5e9", "#f97316", "#ef4444"]
+  }
+}
