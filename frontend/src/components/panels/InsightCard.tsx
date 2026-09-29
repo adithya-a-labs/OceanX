@@ -1,7 +1,7 @@
 import { Card } from '../ui';
 import { Icons } from '../ui/Icon';
 import { Icon } from '../ui/Icon';
-import { formatRMSE, formatValue } from '../../utils/formatters';
+import { formatRMSE, formatValue, getUnit } from '../../utils/formatters';
 import type { ArgoComparison } from '../../types';
 
 interface InsightCardProps {
@@ -10,27 +10,50 @@ interface InsightCardProps {
 }
 
 export const InsightCard = ({ observationId, comparison }: InsightCardProps) => {
-  const { rmse, variable, difference } = comparison;
+  const { rmse, variable, difference, insight: curatedInsight } = comparison;
+  const unit = getUnit(variable);
 
-  // Determine insight based on RMSE and difference pattern
-  const avgDiff = difference.reduce((a, b) => a + b, 0) / difference.length;
-  const maxDiff = Math.max(...difference.map(Math.abs));
-  
-  const maxIndex = difference.reduce((best, value, i) =>
-    Math.abs(value) > Math.abs(difference[best]) ? i : best, 0);
-  const insight = {
-    title: 'Largest paired difference',
-    description: `The largest model minus observation difference is ${formatValue(difference[maxIndex], variable)} near ${comparison.depth[maxIndex]?.toFixed(0)} m.`,
-    severity: 'info' as const,
-    trend: avgDiff > 0 ? 'up' as const : avgDiff < 0 ? 'down' as const : 'stable' as const,
-  };
+  // Only trust the statistics over levels that carry a finite difference. An
+  // empty or all-null difference series must not render NaN or Infinity, and the
+  // chart above it is drawn from the same paired levels.
+  const paired = difference
+    .map((value, i) => ({ value, index: i }))
+    .filter(d => Number.isFinite(d.value));
 
-  const trendIcon = insight.trend === 'up' ? Icons.TrendingUp : insight.trend === 'down' ? Icons.TrendingDown : Icons.Activity;
-  const severityColor = {
-    info: 'text-info',
-    warning: 'text-warning',
-    critical: 'text-error',
-  }[insight.severity];
+  if (paired.length === 0) {
+    return (
+      <Card padding="md" className="border-l-4 border-l-border">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 p-2 rounded-lg bg-surface-hover text-text-muted">
+            <Icon name={Icons.Info} size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-text-primary">No paired differences</h4>
+            <p className="text-sm text-text-secondary mt-1">
+              This profile has no levels where the model field and the observation overlap,
+              so RMSE and difference statistics are unavailable.
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  const values = paired.map(d => d.value);
+  const avgDiff = values.reduce((a, b) => a + b, 0) / values.length;
+  const maxDiff = values.reduce((best, v) => Math.max(best, Math.abs(v)), 0);
+  const largest = paired.reduce((best, d) => (Math.abs(d.value) > Math.abs(best.value) ? d : best));
+
+  const largestDepth = comparison.depth[largest.index];
+  const description = curatedInsight ?? (
+    `The largest model minus observation difference is ${formatValue(largest.value, variable)}` +
+    `${Number.isFinite(largestDepth) ? ` near ${largestDepth.toFixed(0)} m` : ''}.`
+  );
+
+  const trend = avgDiff > 0 ? 'up' as const : avgDiff < 0 ? 'down' as const : 'stable' as const;
+  const trendIcon =
+    trend === 'up' ? Icons.TrendingUp : trend === 'down' ? Icons.TrendingDown : Icons.Activity;
+  const severityColor = trend === 'stable' ? 'text-info' : 'text-primary';
 
   return (
     <Card padding="md" className="border-l-4 border-l-primary">
@@ -39,21 +62,26 @@ export const InsightCard = ({ observationId, comparison }: InsightCardProps) => 
           <Icon name={trendIcon} size={20} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-text-primary">{insight.title}</h4>
-            <span className="text-xs font-mono text-primary px-2 py-0.5 rounded bg-primary/10">
-              {formatRMSE(rmse)}
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="font-semibold text-text-primary">Largest paired difference</h4>
+            {Number.isFinite(rmse) && (
+              <span
+                className="text-xs font-mono text-primary px-2 py-0.5 rounded bg-primary/10 whitespace-nowrap"
+                title={`${unit} root mean square error`}
+              >
+                {formatRMSE(rmse, unit)}
+              </span>
+            )}
           </div>
-          <p className="text-sm text-text-secondary mt-1">{insight.description}</p>
-          <div className="mt-3 flex items-center gap-4 text-xs text-text-muted">
+          <p className="text-sm text-text-secondary mt-1">{description}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
             <span className="flex items-center gap-1">
               <Icon name={Icons.BarChart2} size={12} />
-              Avg diff: {formatValue(avgDiff, variable as any)}
+              Avg diff: {formatValue(avgDiff, variable)}
             </span>
             <span className="flex items-center gap-1">
               <Icon name={Icons.TrendingUp} size={12} />
-              Max diff: {formatValue(maxDiff, variable as any)}
+              Max diff: {formatValue(maxDiff, variable)}
             </span>
             <span className="flex items-center gap-1">
               <Icon name={Icons.MapPin} size={12} />

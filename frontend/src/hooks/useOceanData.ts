@@ -4,20 +4,13 @@
  * We only import types and call helpers - Prabhu implements the helpers
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { OceanVariable, OceanSlice, ArgoProfile, ArgoComparison, CurrentsData } from '../types';
+import { useQuery } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
+import type { OceanVariable } from '../types';
+import type { DemoDataHelpers } from '../utils/demoData';
 
-// Type definitions for Prabhu's helper functions
-// These are the functions Prabhu will implement in demoData.ts
-interface DemoDataHelpers {
-  getOceanSlice: (variable: OceanVariable, depth: number, time: string) => Promise<OceanSlice>;
-  getArgoProfiles: (variable: OceanVariable, depth: number, time: string) => Promise<ArgoProfile[]>;
-  getComparison: (observationId: string) => Promise<ArgoComparison>;
-  getCurrents: (time: string) => Promise<CurrentsData>;
-}
-
-// We'll import the actual helpers from Prabhu's module
-// For now, define the interface
+// The helper contract is defined once in utils/demoData. Importing it here
+// instead of re-declaring it keeps the adapter and these hooks in agreement.
 let demoDataHelpers: DemoDataHelpers | null = null;
 
 export function setDemoDataHelpers(helpers: DemoDataHelpers) {
@@ -58,18 +51,24 @@ export function useArgoProfiles(variable: OceanVariable, depth: number, time: st
 }
 
 /**
- * Hook for fetching comparison data for a specific Argo float
+ * Hook for fetching comparison data for a specific Argo float.
+ *
+ * The observation id is part of the query key, so switching floats can never
+ * show one float's model series under another's name. Pass `enabled: false`
+ * while the manifest reports the model assets are not ready; the hook then
+ * stays idle instead of requesting a file that does not exist.
  */
-export function useArgoComparison(observationId: string | undefined) {
+export function useArgoComparison(observationId: string | undefined, enabled: boolean = true) {
   return useQuery({
     queryKey: ['argoComparison', observationId],
     queryFn: () => {
       if (!observationId) throw new Error('No observation ID');
       return getHelpers().getComparison(observationId);
     },
-    enabled: !!observationId,
+    enabled: enabled && !!observationId,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    retry: false,
   });
 }
 
@@ -87,35 +86,52 @@ export function useCurrents(time: string) {
 }
 
 /**
- * Mutation for triggering comparison fetch
- * Used when user clicks an Argo marker
+ * Prefetch a float's comparison so the panel can paint immediately.
+ *
+ * Warm only: a failure here is not surfaced, because a missing comparison
+ * asset is an expected state until the Copernicus export lands. The panel's own
+ * query then reports the real outcome.
+ *
+ * Takes the client rather than calling `useQueryClient` itself, so it is safe to
+ * call from an effect or an event handler; a hook cannot be invoked from a
+ * nested callback.
  */
-export function useFetchComparison() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (observationId: string) => getHelpers().getComparison(observationId),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['argoComparison', data.id], data);
-    },
+export function prefetchArgoComparison(
+  queryClient: QueryClient,
+  observationId: string | undefined,
+  enabled: boolean,
+) {
+  if (!observationId || !enabled) return;
+  void queryClient.prefetchQuery({
+    queryKey: ['argoComparison', observationId],
+    queryFn: () => getHelpers().getComparison(observationId),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 /**
  * Prefetch functions for performance
  */
-export function prefetchOceanSlice(variable: OceanVariable, depth: number, time: string) {
-  const queryClient = useQueryClient();
-  queryClient.prefetchQuery({
+export function prefetchOceanSlice(
+  queryClient: QueryClient,
+  variable: OceanVariable,
+  depth: number,
+  time: string,
+) {
+  void queryClient.prefetchQuery({
     queryKey: ['oceanSlice', variable, depth, time],
     queryFn: () => getHelpers().getOceanSlice(variable, depth, time),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function prefetchArgoProfiles(variable: OceanVariable, depth: number, time: string) {
-  const queryClient = useQueryClient();
-  queryClient.prefetchQuery({
+export function prefetchArgoProfiles(
+  queryClient: QueryClient,
+  variable: OceanVariable,
+  depth: number,
+  time: string,
+) {
+  void queryClient.prefetchQuery({
     queryKey: ['argoProfiles', variable, depth, time],
     queryFn: () => getHelpers().getArgoProfiles(variable, depth, time),
     staleTime: 5 * 60 * 1000,

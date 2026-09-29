@@ -2,6 +2,7 @@ import { useOceanStore } from '../../store';
 import { oceanTokens } from '../../design-system';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrents, getOceanLayer } from '../../data';
+import { formatDepth } from '../../utils/formatters';
 
 const VARIABLE_GRADIENTS = {
   temperature: oceanTokens.colors.temperature.gradient,
@@ -26,6 +27,7 @@ export const Legend = () => {
   const depthId = useOceanStore((s) => s.depthId);
   const timeId = useOceanStore((s) => s.timeId);
   const ready = useOceanStore((s) => s.manifest?.assetsReady ?? false);
+  const manifest = useOceanStore((s) => s.manifest);
   const { data: range } = useQuery({
     queryKey: ['legend', variable, depthId, timeId],
     enabled: ready,
@@ -44,7 +46,21 @@ export const Legend = () => {
   const unit = VARIABLE_UNITS[variable];
   const label = VARIABLE_LABELS[variable];
 
-  if (!ready) return <p className="text-xs text-text-muted">Model color scale pending.</p>;
+  if (!ready) {
+    // Name the real model levels rather than only saying "pending": the depths are
+    // already verified against the catalogue even though the fields are not staged.
+    const levels = (manifest?.depths ?? []).map(d => d.actualDepthM);
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-text-muted">Model color scale pending.</p>
+        {levels.length > 0 && (
+          <p className="font-mono text-[11px] leading-relaxed text-text-muted">
+            {levels.map(d => formatDepth(d, true)).join(' · ')}
+          </p>
+        )}
+      </div>
+    );
+  }
   if (!range) return <p className="text-xs text-text-muted">Loading color scale…</p>;
   const { min, max } = range;
 

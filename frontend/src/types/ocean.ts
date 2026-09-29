@@ -89,6 +89,8 @@ export interface ArgoComparison {
   model: number[];
   difference: number[];
   rmse: number;
+  /** Curated insight text from the dataset author; shown verbatim when present. */
+  insight?: string;
 }
 
 export interface InsightData {

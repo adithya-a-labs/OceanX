@@ -6,6 +6,7 @@
 
 import type { OceanVariable, OceanSlice, ArgoProfile, CurrentsData } from '../types';
 import { createDemoDataHelpers, createMockDemoDataHelpers } from '../utils/demoData';
+import { demoDataHelpers as realDataHelpers } from '../data/legacyAdapter';
 
 export interface GlobeDataAdapter {
   getOceanSlice: (variable: OceanVariable, depth: number, time: string) => Promise<OceanSlice>;
@@ -233,13 +234,16 @@ export function createGlobeDataAdapter(basePath: string = '/demo-data'): GlobeDa
     },
 
     async getArgoProfiles(variable: OceanVariable, depth: number, time: string): Promise<ArgoProfile[]> {
+      // Use the same real Argo pipeline as the dashboard so marker ids match
+      // the ids the details panel resolves against. The synthetic
+      // argo-profiles.json uses argo_demo_* ids and would desync selection.
       try {
-        const profiles = await fileHelpers.getArgoProfiles(variable, depth, time);
+        const profiles = await realDataHelpers.getArgoProfiles(variable, depth, time);
         if (profiles && profiles.length > 0) {
           return profiles;
         }
       } catch {
-        // Fall through
+        // Fall through to mock only when the real dataset is unavailable.
       }
 
       return mockHelpers.getArgoProfiles(variable, depth, time);

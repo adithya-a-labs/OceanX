@@ -42,7 +42,7 @@ export const demoDataHelpers = {
       longitude: comparison.match.observationLongitude,
       time: comparison.match.observationTime, variable: comparison.variable,
       depth: comparison.depthM, observed: comparison.observed, model: comparison.model,
-      difference: comparison.difference, rmse: comparison.rmse,
+      difference: comparison.difference, rmse: comparison.rmse, insight: comparison.insight,
     };
   },
   async getCurrents(time: string): Promise<CurrentsData> {
