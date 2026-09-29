@@ -6,6 +6,7 @@ import { demoDataHelpers } from './data/legacyAdapter';
 import { demoDataBasePath, loadDemoManifest } from './data/demoData';
 import { preloadNearbyFrames } from './data/preload';
 import { setDemoDataHelpers } from './hooks/useOceanData';
+import './globe';
 import type { OceanVariable, InitializeGlobe, GlobeInstance, ArgoMarker } from './types';
 
 setDemoDataHelpers(demoDataHelpers);
