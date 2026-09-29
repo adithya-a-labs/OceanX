@@ -4,6 +4,7 @@ import { MainLayout } from './components/layout';
 import { useGlobeBridge, useGlobeSync } from './hooks/useArgoSelection';
 import { createMockDemoDataHelpers } from './utils/demoData';
 import { setDemoDataHelpers } from './hooks/useOceanData';
+import './globe';
 import type { OceanVariable, InitializeGlobe, GlobeInstance, ArgoMarker } from './types';
 
 // Extend Window type for globe integration
