@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useOceanStore } from '../../store';
 import { Button } from '../ui';
 import { Icons } from '../ui/Icon';
-import { formatTime, formatDateTime } from '../../utils/formatters';
+import { formatDateTime } from '../../utils/formatters';
 
 interface TimeScrubberProps {
   availableTimes?: string[];
@@ -10,9 +10,9 @@ interface TimeScrubberProps {
   onPause?: () => void;
 }
 
-const DEFAULT_TIMES = ['2026-09-24T12:00:00Z'];
-
-export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }: TimeScrubberProps) => {
+export const TimeScrubber = ({ availableTimes, onPlay, onPause }: TimeScrubberProps) => {
+  const manifest = useOceanStore((s) => s.manifest);
+  const times = useMemo(() => availableTimes ?? manifest?.times.map(t => t.iso) ?? [], [availableTimes, manifest]);
   const time = useOceanStore((s) => s.time);
   const setTime = useOceanStore((s) => s.setTime);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -20,17 +20,17 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
 
   // Sync index with time
   useEffect(() => {
-    const index = availableTimes.indexOf(time);
+    const index = times.indexOf(time);
     if (index !== -1) {
       setCurrentIndex(index);
     }
-  }, [time, availableTimes]);
+  }, [time, times]);
 
   const handleTimeChange = useCallback((newTime: string) => {
     setTime(newTime);
-    const index = availableTimes.indexOf(newTime);
+    const index = times.indexOf(newTime);
     if (index !== -1) setCurrentIndex(index);
-  }, [setTime, availableTimes]);
+  }, [setTime, times]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -43,21 +43,21 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
   }, [onPause]);
 
   const handleStep = useCallback((direction: number) => {
-    const newIndex = Math.max(0, Math.min(availableTimes.length - 1, currentIndex + direction));
-    handleTimeChange(availableTimes[newIndex]);
-  }, [currentIndex, availableTimes, handleTimeChange]);
+    const newIndex = Math.max(0, Math.min(times.length - 1, currentIndex + direction));
+    if (times[newIndex]) handleTimeChange(times[newIndex]);
+  }, [currentIndex, times, handleTimeChange]);
 
   // Auto-play logic
   useEffect(() => {
-    if (!isPlaying || availableTimes.length <= 1) return;
+    if (!isPlaying || times.length <= 1) return;
 
     const interval = setInterval(() => {
-      const nextIndex = (currentIndex + 1) % availableTimes.length;
-      handleTimeChange(availableTimes[nextIndex]);
+      const nextIndex = (currentIndex + 1) % times.length;
+      handleTimeChange(times[nextIndex]);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentIndex, availableTimes, handleTimeChange]);
+  }, [isPlaying, currentIndex, times, handleTimeChange]);
 
   return (
     <div className="space-y-2">
@@ -71,7 +71,7 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
           size="sm"
           icon={Icons.SkipBack}
           onClick={() => handleStep(-1)}
-          disabled={availableTimes.length <= 1}
+          disabled={times.length <= 1}
           aria-label="Previous time step"
         />
         <Button
@@ -79,7 +79,7 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
           size="sm"
           icon={isPlaying ? Icons.Pause : Icons.Play}
           onClick={isPlaying ? handlePause : handlePlay}
-          disabled={availableTimes.length <= 1}
+          disabled={times.length <= 1}
           aria-label={isPlaying ? 'Pause animation' : 'Play animation'}
         />
         <Button
@@ -87,7 +87,7 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
           size="sm"
           icon={Icons.SkipForward}
           onClick={() => handleStep(1)}
-          disabled={availableTimes.length <= 1}
+          disabled={times.length <= 1}
           aria-label="Next time step"
         />
       </div>
@@ -96,10 +96,11 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
         <input
           type="range"
           min={0}
-          max={availableTimes.length - 1}
+          max={Math.max(0, times.length - 1)}
           step={1}
           value={currentIndex}
-          onChange={(e) => handleTimeChange(availableTimes[Number(e.target.value)])}
+          onChange={(e) => { const selected = times[Number(e.target.value)]; if (selected) handleTimeChange(selected); }}
+          disabled={times.length <= 1}
           style={{
             backgroundImage: 'linear-gradient(var(--color-surface), var(--color-surface))',
             backgroundSize: '100% 8px',
@@ -110,22 +111,23 @@ export const TimeScrubber = ({ availableTimes = DEFAULT_TIMES, onPlay, onPause }
           aria-label="Time scrubber"
         />
         <div className="flex justify-between mt-1 text-xs text-text-secondary">
-          {availableTimes.map((t, i) => (
+          {times.map((t, i) => (
             <span
               key={t}
-              style={{ left: `${(i / (availableTimes.length - 1)) * 100}%` }}
+              style={{ left: `${(i / Math.max(1, times.length - 1)) * 100}%` }}
               className={`relative whitespace-nowrap ${
-                i === 0 ? '' : i === availableTimes.length - 1 ? '-translate-x-full' : '-translate-x-1/2'
+                i === 0 ? '' : i === times.length - 1 ? '-translate-x-full' : '-translate-x-1/2'
               } ${i === currentIndex ? 'text-text-primary font-medium' : ''}`}
             >
-              {formatTime(t)}
+              {t.slice(0, 10)}
             </span>
           ))}
         </div>
       </div>
 
       <div className="text-xs text-text-secondary text-center">
-        {formatDateTime(time)}
+        {time ? formatDateTime(time) : 'Loading dates…'}
+        {manifest && !manifest.assetsReady ? ' · planned dates' : ''}
       </div>
     </div>
   );

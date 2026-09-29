@@ -24,7 +24,7 @@ export interface OceanSlice {
   variable: OceanVariable;
   depth: number;
   time: string;
-  data: number[][];
+  data: (number | null)[][];
   bounds: {
     north: number;
     south: number;
@@ -41,8 +41,8 @@ export interface OceanSlice {
 
 export interface CurrentsData {
   time: string;
-  u: number[][]; // Eastward velocity
-  v: number[][]; // Northward velocity
+  u: (number | null)[][]; // Eastward velocity
+  v: (number | null)[][]; // Northward velocity
   bounds: {
     north: number;
     south: number;
@@ -75,7 +75,7 @@ export interface ArgoProfile {
   time: string;
   depth: number[];
   temperature: number[];
-  salinity: number[];
+  salinity: (number | null)[];
 }
 
 export interface ArgoComparison {

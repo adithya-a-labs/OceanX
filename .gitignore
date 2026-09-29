@@ -14,6 +14,8 @@ data/processed/
 *.h5
 *.hdf5
 *.zarr
+.cache/
+.python/
 .DS_Store
 .vscode/
 .idea/

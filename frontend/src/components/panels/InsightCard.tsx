@@ -16,28 +16,14 @@ export const InsightCard = ({ observationId, comparison }: InsightCardProps) => 
   const avgDiff = difference.reduce((a, b) => a + b, 0) / difference.length;
   const maxDiff = Math.max(...difference.map(Math.abs));
   
-  let insight: { title: string; description: string; severity: 'info' | 'warning' | 'critical'; trend: 'up' | 'down' | 'stable' } = {
-    title: 'Good Agreement',
-    description: 'Model and observations show strong agreement across all depths.',
-    severity: 'info',
-    trend: 'stable',
+  const maxIndex = difference.reduce((best, value, i) =>
+    Math.abs(value) > Math.abs(difference[best]) ? i : best, 0);
+  const insight = {
+    title: 'Largest paired difference',
+    description: `The largest model minus observation difference is ${formatValue(difference[maxIndex], variable)} near ${comparison.depth[maxIndex]?.toFixed(0)} m.`,
+    severity: 'info' as const,
+    trend: avgDiff > 0 ? 'up' as const : avgDiff < 0 ? 'down' as const : 'stable' as const,
   };
-
-  if (rmse > 1.0) {
-    insight = {
-      title: 'Significant Discrepancy',
-      description: `Model differs from observations by ${formatValue(maxDiff, variable as any)} on average. Consider data assimilation.`,
-      severity: 'warning',
-      trend: avgDiff > 0 ? 'up' : 'down',
-    };
-  } else if (rmse > 0.5) {
-    insight = {
-      title: 'Moderate Mismatch',
-      description: `Systematic bias of ${formatValue(avgDiff, variable as any)} detected. Model runs ${avgDiff > 0 ? 'warmer/saltier' : 'cooler/fresher'} than observations.`,
-      severity: 'info',
-      trend: avgDiff > 0 ? 'up' : 'down',
-    };
-  }
 
   const trendIcon = insight.trend === 'up' ? Icons.TrendingUp : insight.trend === 'down' ? Icons.TrendingDown : Icons.Activity;
   const severityColor = {

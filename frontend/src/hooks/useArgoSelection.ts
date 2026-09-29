@@ -5,7 +5,6 @@
 
 import { useCallback, useEffect } from 'react';
 import { useOceanStore } from '../store';
-import { useFetchComparison } from './useOceanData';
 import type { ArgoMarker } from '../types';
 
 /**
@@ -16,29 +15,15 @@ export function useArgoSelection() {
   const argoComparison = useOceanStore((s) => s.argoComparison);
   const isComparisonLoading = useOceanStore((s) => s.isComparisonLoading);
   const setSelectedArgoId = useOceanStore((s) => s.setSelectedArgoId);
-  const setArgoComparison = useOceanStore((s) => s.setArgoComparison);
-  const setIsComparisonLoading = useOceanStore((s) => s.setIsComparisonLoading);
-  const fetchComparison = useFetchComparison();
+  const clearSelectedArgo = useOceanStore((s) => s.clearSelectedArgo);
 
   const selectArgo = useCallback((marker: ArgoMarker) => {
     setSelectedArgoId(marker.id);
-    setIsComparisonLoading(true);
-    fetchComparison.mutate(marker.id, {
-      onSuccess: (data) => {
-        setArgoComparison(data);
-        setIsComparisonLoading(false);
-      },
-      onError: () => {
-        setArgoComparison(null);
-        setIsComparisonLoading(false);
-      },
-    });
-  }, [setSelectedArgoId, setArgoComparison, setIsComparisonLoading, fetchComparison]);
+  }, [setSelectedArgoId]);
 
   const clearSelection = useCallback(() => {
-    setSelectedArgoId(undefined);
-    setArgoComparison(null);
-  }, [setSelectedArgoId, setArgoComparison]);
+    clearSelectedArgo();
+  }, [clearSelectedArgo]);
 
   return {
     selectedArgoId,

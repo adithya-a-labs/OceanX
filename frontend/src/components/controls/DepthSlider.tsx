@@ -2,19 +2,12 @@ import { useOceanStore } from '../../store';
 import { Slider } from '../ui';
 import { formatDepth } from '../../utils/formatters';
 
-const DEPTH_MARKS = [
-  { value: 0, label: '0m' },
-  { value: 50, label: '50m' },
-  { value: 100, label: '100m' },
-  { value: 200, label: '200m' },
-  { value: 500, label: '500m' },
-  { value: 1000, label: '1km' },
-  { value: 2000, label: '2km' },
-];
-
 export const DepthSlider = () => {
+  const manifest = useOceanStore((s) => s.manifest);
   const depth = useOceanStore((s) => s.depth);
   const setDepth = useOceanStore((s) => s.setDepth);
+  const levels = manifest?.depths ?? [];
+  const actual = levels.find(d => d.requestedDepthM === depth)?.actualDepthM;
 
   return (
     <div className="space-y-2">
@@ -23,16 +16,16 @@ export const DepthSlider = () => {
           Depth
         </label>
         <span className="text-sm font-mono text-text-primary">
-          {formatDepth(depth)}
+          {formatDepth(depth)}{actual !== undefined ? ` target (model ${actual.toFixed(1)} m)` : ''}
         </span>
       </div>
       <Slider
         min={0}
-        max={2000}
-        step={10}
+        max={levels.at(-1)?.requestedDepthM ?? 500}
+        step={50}
         value={depth}
         onChange={setDepth}
-        marks={DEPTH_MARKS}
+        marks={levels.map(d => ({ value: d.requestedDepthM, label: d.requestedDepthM === 0 ? 'surface' : `~${d.requestedDepthM}m` }))}
         aria-label="Ocean depth"
         className="w-full"
       />
