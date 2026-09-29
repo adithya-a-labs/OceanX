@@ -1,0 +1,13 @@
+{
+  "variable": "salinity",
+  "depth": 0,
+  "time": "2026-09-24T12:00:00Z",
+  "data": [],
+  "bounds": { "north": 18, "south": 12, "east": 90, "west": 82 },
+  "metadata": {
+    "min": 33.0,
+    "max": 34.5,
+    "unit": "PSU",
+    "colorScale": ["#0ea5e9", "#22d3ee", "#a5f3fc"]
+  }
+}
