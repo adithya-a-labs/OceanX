@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getCurrents, getOceanLayer } from '../../data';
 import { formatDepth } from '../../utils/formatters';
 
-const VARIABLE_GRADIENTS = {
-  temperature: oceanTokens.colors.temperature.gradient,
-  salinity: oceanTokens.colors.salinity.gradient,
-  currents: oceanTokens.colors.currents.gradient,
+const VARIABLE_SWATCHES = {
+  temperature: oceanTokens.colors.temperature.swatches,
+  salinity: oceanTokens.colors.salinity.swatches,
+  currents: oceanTokens.colors.currents.swatches,
 };
 
 const VARIABLE_UNITS = {
@@ -42,7 +42,7 @@ export const Legend = () => {
     },
   });
 
-  const gradient = VARIABLE_GRADIENTS[variable];
+  const swatches = VARIABLE_SWATCHES[variable];
   const unit = VARIABLE_UNITS[variable];
   const label = VARIABLE_LABELS[variable];
 
@@ -66,22 +66,34 @@ export const Legend = () => {
 
   return (
     <div className="space-y-2">
-      <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-        {label}
-      </label>
-      <div className="space-y-1.5">
-        <div
-          className="h-2 rounded-full"
-          style={{
-            background: `linear-gradient(90deg, ${gradient.join(', ')})`,
-          }}
-          role="img"
-          aria-label={`${label} color scale from ${min}${unit} to ${max}${unit}`}
-        />
-        <div className="flex justify-between text-xs text-text-muted font-mono">
-          <span>{min.toFixed(2)}{unit}</span>
-          <span>{max.toFixed(2)}{unit}</span>
-        </div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+          {label}
+        </span>
+        <span className="font-mono text-[10px] text-text-muted">{unit}</span>
+      </div>
+
+      {/* Discrete swatches rather than a gradient: the ramp is shown as separate
+          solid blocks, so nothing here depends on interpolating between colors. */}
+      <div
+        className="flex h-2.5 gap-px overflow-hidden rounded-sm border border-border"
+        role="img"
+        aria-label={`${label} color scale from ${min}${unit} to ${max}${unit}`}
+      >
+        {swatches.map((color, i) => (
+          <span
+            key={color}
+            aria-hidden="true"
+            className="flex-1 first:rounded-l-[1px] last:rounded-r-[1px]"
+            style={{ backgroundColor: color }}
+            data-swatch={i}
+          />
+        ))}
+      </div>
+
+      <div className="flex justify-between font-mono text-[11px] text-text-secondary">
+        <span>{min.toFixed(2)}{unit}</span>
+        <span>{max.toFixed(2)}{unit}</span>
       </div>
     </div>
   );

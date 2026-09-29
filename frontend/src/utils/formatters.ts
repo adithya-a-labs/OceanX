@@ -170,16 +170,6 @@ export function truncate(text: string, maxLength: number): string {
 }
 
 /**
- * Generate color stop for gradient
- */
-export function generateColorStops(colors: string[], stops?: number[]): string {
-  if (stops && stops.length === colors.length) {
-    return colors.map((c, i) => `${c} ${stops[i]}%`).join(', ');
-  }
-  return colors.join(', ');
-}
-
-/**
  * Clamp value between min and max
  */
 export function clamp(value: number, min: number, max: number): number {

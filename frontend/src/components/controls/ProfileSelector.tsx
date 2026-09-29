@@ -75,11 +75,12 @@ export const ProfileSelector = () => {
                   }
                   className={`
                     w-full flex items-center gap-3 px-3 py-2.5 text-left
-                    rounded-lg border-2 transition-all duration-200
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
-                    ${isSelected
-                      ? 'bg-primary/20 border-primary'
-                      : 'bg-surface border-border hover:border-border-hover'
+                    rounded-md border transition-colors duration-200
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
+                    ${
+                      isSelected
+                        ? 'bg-surface-elevated border-primary'
+                        : 'bg-surface border-border hover:border-border-hover'
                     }
                   `}
                 >

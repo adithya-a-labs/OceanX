@@ -33,17 +33,19 @@ export const Toggle = forwardRef<HTMLInputElement, ToggleProps>(
           {...props}
         />
         <div className={`
-          relative inline-flex h-6 w-11 items-center
+          relative inline-flex h-5 w-9 items-center
           rounded-full border border-border bg-surface
           transition-colors duration-200
           peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background
           group-has-[:checked]:bg-primary group-has-[:checked]:border-primary
           group-has-[:disabled]:opacity-50 group-has-[:disabled]:cursor-not-allowed
         `} aria-hidden="true">
+          {/* Flat knob: no drop shadow, and it inverts to the near-black
+              foreground on the accent fill so the switch reads without glow. */}
           <span className={`
-            block h-4 w-4 transform rounded-full bg-white shadow-2
+            ml-[3px] block h-3.5 w-3.5 transform rounded-full bg-text-secondary
             transition-transform duration-200 ease-out
-            group-has-[:checked]:translate-x-5
+            group-has-[:checked]:translate-x-4 group-has-[:checked]:bg-primary-foreground
           `} />
         </div>
         <div className="flex items-center gap-2">

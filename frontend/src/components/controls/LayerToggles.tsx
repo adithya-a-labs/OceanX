@@ -10,9 +10,9 @@ export const LayerToggles = () => {
 
   return (
     <div className="space-y-2">
-      <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+      <span className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
         Layers
-      </label>
+      </span>
       <div className="space-y-2">
         <Toggle
           id="toggle-argo"

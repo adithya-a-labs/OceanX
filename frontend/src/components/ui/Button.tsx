@@ -26,17 +26,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const baseClasses = `
       inline-flex items-center justify-center gap-2
-      font-medium transition-all duration-150
+      font-medium transition-colors duration-150 border
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background
       disabled:opacity-50 disabled:cursor-not-allowed
       rounded-md
     `;
 
     const variantClasses = {
-      primary: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active shadow-[0_2px_4px_rgb(0_0_0/0.3)]',
-      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-active shadow-[0_2px_4px_rgb(0_0_0/0.3)]',
-      ghost: 'bg-transparent text-text-primary hover:bg-surface-hover active:bg-surface',
-      accent: 'bg-accent text-accent-foreground hover:bg-accent-hover active:bg-accent-active shadow-[0_2px_4px_rgb(249_115_22/0.3)]',
+      primary: 'bg-primary text-primary-foreground border-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active',
+      secondary: 'bg-surface-elevated text-text-primary border-border hover:bg-surface-hover hover:border-border-hover active:bg-surface',
+      ghost: 'bg-transparent text-text-secondary border-transparent hover:bg-surface-hover hover:text-text-primary hover:border-border active:bg-surface',
+      accent: 'bg-accent text-accent-foreground border-accent hover:bg-accent-hover hover:border-accent-hover active:bg-accent-active',
     };
 
     const sizeClasses = {

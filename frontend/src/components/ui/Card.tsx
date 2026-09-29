@@ -8,16 +8,16 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ padding = 'md', className = '', children, ...props }, ref) => {
     const paddingClasses = {
       none: '',
-      sm: 'p-4',
-      md: 'p-6',
-      lg: 'p-8',
+      sm: 'p-3',
+      md: 'p-4',
+      lg: 'p-6',
     };
 
     return (
       <div
         ref={ref}
         className={`
-          glass-panel
+          panel-flat
           ${paddingClasses[padding]}
           ${className}
         `}
