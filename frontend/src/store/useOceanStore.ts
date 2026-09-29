@@ -14,6 +14,7 @@ interface OceanStore extends OceanViewState {
   manifest: DemoManifest | null;
   depthId: string;
   timeId: string;
+  recentArgoIds: string[];
   initializeFromManifest: (manifest: DemoManifest) => void;
   setDepthId: (depthId: string) => void;
   setTimeId: (timeId: string) => void;
@@ -24,6 +25,7 @@ interface OceanStore extends OceanViewState {
   // selection change can never leave a stale comparison or spinner behind.
   selectArgo: (id: string | undefined) => void;
   clearSelectedArgo: () => void;
+  clearRecentArgo: () => void;
   // Actions
   setVariable: (variable: OceanVariable) => void;
   setDepth: (depth: number) => void;
@@ -74,13 +76,23 @@ const defaultState: OceanViewState = {
 };
 
 /**
- * The single selection transition. Selecting, reselecting, or clearing a float
- * all land here, and each transition clears the panel-level error so a failure
- * from a previous float can never be shown against the next one.
+ * Update selection and maintain a list of up to 3 recently visited Argo floats.
  */
-function selectionPatch(selectedArgoId: string | undefined) {
+function updateSelectionWithRecents(
+  currentSelected: string | undefined,
+  currentRecents: string[],
+  newSelected: string | undefined
+) {
+  let nextRecents = [...currentRecents];
+  if (currentSelected && currentSelected !== newSelected) {
+    nextRecents = [currentSelected, ...nextRecents.filter((id) => id !== currentSelected && id !== newSelected)].slice(0, 3);
+  } else if (newSelected) {
+    nextRecents = nextRecents.filter((id) => id !== newSelected);
+  }
+
   return {
-    selectedArgoId,
+    selectedArgoId: newSelected,
+    recentArgoIds: nextRecents,
     error: null,
   };
 }
@@ -91,6 +103,7 @@ export const useOceanStore = create<OceanStore>()(
     manifest: null,
     depthId: 'depth-0',
     timeId: 't0',
+    recentArgoIds: [],
     camera: null,
     isGlobeReady: false,
     isLoadingOceanSlice: false,
@@ -141,9 +154,10 @@ export const useOceanStore = create<OceanStore>()(
     setBounds: (bounds) => set({ bounds }),
     setShowArgo: (showArgo) => set({ showArgo }),
     setShowCurrents: (showCurrents) => set({ showCurrents }),
-    setSelectedArgoId: (selectedArgoId) => set(selectionPatch(selectedArgoId || undefined)),
-    selectArgo: (selectedArgoId) => set(selectionPatch(selectedArgoId || undefined)),
-    clearSelectedArgo: () => set(selectionPatch(undefined)),
+    setSelectedArgoId: (id) => set((state) => updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, id || undefined)),
+    selectArgo: (id) => set((state) => updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, id || undefined)),
+    clearSelectedArgo: () => set((state) => updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, undefined)),
+    clearRecentArgo: () => set({ recentArgoIds: [] }),
 
     // Globe
     setCamera: (camera) => set({ camera }),
@@ -162,7 +176,7 @@ export const useOceanStore = create<OceanStore>()(
       depth: state.manifest?.depths[0]?.requestedDepthM ?? defaultState.depth,
       timeId: state.manifest?.times[0]?.id ?? 't0',
       time: state.manifest?.times[0]?.iso ?? defaultState.time,
-      ...selectionPatch(undefined),
+      ...updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, undefined),
     })),
   }))
 );
@@ -174,6 +188,7 @@ export const selectTime = (state: OceanStore) => state.time;
 export const selectShowArgo = (state: OceanStore) => state.showArgo;
 export const selectShowCurrents = (state: OceanStore) => state.showCurrents;
 export const selectSelectedArgoId = (state: OceanStore) => state.selectedArgoId;
+export const selectRecentArgoIds = (state: OceanStore) => state.recentArgoIds;
 export const selectCamera = (state: OceanStore) => state.camera;
 export const selectIsGlobeReady = (state: OceanStore) => state.isGlobeReady;
 export const selectBounds = (state: OceanStore) => state.bounds;

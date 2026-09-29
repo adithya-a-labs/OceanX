@@ -10,6 +10,7 @@ export {
   selectShowArgo,
   selectShowCurrents,
   selectSelectedArgoId,
+  selectRecentArgoIds,
   selectCamera,
   selectIsGlobeReady,
   selectBounds,
