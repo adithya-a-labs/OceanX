@@ -1,9 +1,36 @@
 /**
  * OceanX Formatters
  * Utility functions for formatting numbers, dates, units
+ *
+ * Units follow the dataset spec exactly: degrees Celsius for temperature,
+ * psu for salinity, m/s for currents, metres for depth. Scientific readers
+ * spot-check these strings, so they are defined once here and never spelled
+ * out inline.
  */
 
 import type { OceanVariable } from '../types';
+
+/**
+ * Unit symbol for a variable.
+ */
+export function getUnit(variable: OceanVariable): string {
+  switch (variable) {
+    case 'temperature': return '°C';
+    case 'salinity': return 'psu';
+    case 'currents': return 'm/s';
+  }
+}
+
+/**
+ * Human label for a variable.
+ */
+export function getVariableLabel(variable: OceanVariable): string {
+  switch (variable) {
+    case 'temperature': return 'Temperature';
+    case 'salinity': return 'Salinity';
+    case 'currents': return 'Currents';
+  }
+}
 
 /**
  * Format a number with specified precision
@@ -24,7 +51,7 @@ export function formatTemperature(value: number, precision: number = 1): string 
  * Format salinity with unit
  */
 export function formatSalinity(value: number, precision: number = 2): string {
-  return `${formatNumber(value, precision)} PSU`;
+  return `${formatNumber(value, precision)} psu`;
 }
 
 /**
@@ -35,13 +62,29 @@ export function formatCurrents(value: number, precision: number = 2): string {
 }
 
 /**
- * Format depth with unit
+ * Format a value with its variable's unit.
  */
-export function formatDepth(value: number): string {
-  if (value >= 1000) {
+export function formatValue(value: number, variable: OceanVariable, precision?: number): string {
+  const defaultPrecision = variable === 'salinity' ? 2 : 1;
+  const p = precision ?? defaultPrecision;
+
+  switch (variable) {
+    case 'temperature': return formatTemperature(value, p);
+    case 'salinity': return formatSalinity(value, p);
+    case 'currents': return formatCurrents(value, p);
+  }
+}
+
+/**
+ * Format depth in metres. Metres are the default everywhere in OceanX so a
+ * profile axis, a table row, and a chart tooltip all quote the same number;
+ * pass `compact` for a coarser km label in tight space.
+ */
+export function formatDepth(value: number, compact: boolean = false): string {
+  if (compact && value >= 1000) {
     return `${(value / 1000).toFixed(1)} km`;
   }
-  return `${value} m`;
+  return `${value.toFixed(value < 10 ? 1 : 0)} m`;
 }
 
 /**
@@ -105,35 +148,10 @@ export function formatRelativeTime(isoString: string): string {
 }
 
 /**
- * Get unit for variable
+ * Format RMSE with its unit
  */
-export function getUnit(variable: OceanVariable): string {
-  switch (variable) {
-    case 'temperature': return '°C';
-    case 'salinity': return 'PSU';
-    case 'currents': return 'm/s';
-  }
-}
-
-/**
- * Format value based on variable
- */
-export function formatValue(value: number, variable: OceanVariable, precision?: number): string {
-  const defaultPrecision = variable === 'salinity' ? 2 : 1;
-  const p = precision ?? defaultPrecision;
-  
-  switch (variable) {
-    case 'temperature': return formatTemperature(value, p);
-    case 'salinity': return formatSalinity(value, p);
-    case 'currents': return formatCurrents(value, p);
-  }
-}
-
-/**
- * Format RMSE value
- */
-export function formatRMSE(value: number): string {
-  return `RMSE: ${formatNumber(value, 3)}`;
+export function formatRMSE(value: number, unit: string = ''): string {
+  return `RMSE ${formatNumber(value, 3)}${unit ? ` ${unit}` : ''}`;
 }
 
 /**

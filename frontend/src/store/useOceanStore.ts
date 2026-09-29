@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { OceanViewState, OceanVariable, ArgoComparison, CameraState } from '../types';
+import type { OceanViewState, OceanVariable, CameraState } from '../types';
 import type { DemoManifest } from '../types';
 
 interface OceanStore extends OceanViewState {
@@ -19,7 +19,10 @@ interface OceanStore extends OceanViewState {
   setTimeId: (timeId: string) => void;
   nextTime: () => void;
   previousTime: () => void;
-  selectArgo: (id: string) => void;
+  // Canonical selection writers. Every caller — ProfileSelector, the globe
+  // bridge, the Argo panel close button — funnels through these two so a
+  // selection change can never leave a stale comparison or spinner behind.
+  selectArgo: (id: string | undefined) => void;
   clearSelectedArgo: () => void;
   // Actions
   setVariable: (variable: OceanVariable) => void;
@@ -29,12 +32,10 @@ interface OceanStore extends OceanViewState {
   setShowArgo: (show: boolean) => void;
   setShowCurrents: (show: boolean) => void;
   setSelectedArgoId: (id: string | undefined) => void;
-  
-  // Argo comparison state
-  argoComparison: ArgoComparison | null;
-  setArgoComparison: (comparison: ArgoComparison | null) => void;
-  isComparisonLoading: boolean;
-  setIsComparisonLoading: (loading: boolean) => void;
+
+  // Note: comparison data is deliberately not stored here. It is fetched and
+  // cached by React Query under ['argoComparison', observationId], so a stale
+  // pairing is impossible by construction. This store holds view state only.
   
   // Globe state
   camera: CameraState | null;
@@ -72,14 +73,24 @@ const defaultState: OceanViewState = {
   selectedArgoId: undefined,
 };
 
+/**
+ * The single selection transition. Selecting, reselecting, or clearing a float
+ * all land here, and each transition clears the panel-level error so a failure
+ * from a previous float can never be shown against the next one.
+ */
+function selectionPatch(selectedArgoId: string | undefined) {
+  return {
+    selectedArgoId,
+    error: null,
+  };
+}
+
 export const useOceanStore = create<OceanStore>()(
   subscribeWithSelector((set) => ({
     ...defaultState,
     manifest: null,
     depthId: 'depth-0',
     timeId: 't0',
-    argoComparison: null,
-    isComparisonLoading: false,
     camera: null,
     isGlobeReady: false,
     isLoadingOceanSlice: false,
@@ -130,13 +141,9 @@ export const useOceanStore = create<OceanStore>()(
     setBounds: (bounds) => set({ bounds }),
     setShowArgo: (showArgo) => set({ showArgo }),
     setShowCurrents: (showCurrents) => set({ showCurrents }),
-    setSelectedArgoId: (selectedArgoId) => set({ selectedArgoId, argoComparison: null }),
-    selectArgo: (selectedArgoId) => set({ selectedArgoId, argoComparison: null }),
-    clearSelectedArgo: () => set({ selectedArgoId: undefined, argoComparison: null }),
-
-    // Argo comparison
-    setArgoComparison: (argoComparison) => set({ argoComparison }),
-    setIsComparisonLoading: (isComparisonLoading) => set({ isComparisonLoading }),
+    setSelectedArgoId: (selectedArgoId) => set(selectionPatch(selectedArgoId || undefined)),
+    selectArgo: (selectedArgoId) => set(selectionPatch(selectedArgoId || undefined)),
+    clearSelectedArgo: () => set(selectionPatch(undefined)),
 
     // Globe
     setCamera: (camera) => set({ camera }),
@@ -155,7 +162,7 @@ export const useOceanStore = create<OceanStore>()(
       depth: state.manifest?.depths[0]?.requestedDepthM ?? defaultState.depth,
       timeId: state.manifest?.times[0]?.id ?? 't0',
       time: state.manifest?.times[0]?.iso ?? defaultState.time,
-      selectedArgoId: undefined, argoComparison: null,
+      ...selectionPatch(undefined),
     })),
   }))
 );
@@ -167,8 +174,6 @@ export const selectTime = (state: OceanStore) => state.time;
 export const selectShowArgo = (state: OceanStore) => state.showArgo;
 export const selectShowCurrents = (state: OceanStore) => state.showCurrents;
 export const selectSelectedArgoId = (state: OceanStore) => state.selectedArgoId;
-export const selectArgoComparison = (state: OceanStore) => state.argoComparison;
-export const selectIsComparisonLoading = (state: OceanStore) => state.isComparisonLoading;
 export const selectCamera = (state: OceanStore) => state.camera;
 export const selectIsGlobeReady = (state: OceanStore) => state.isGlobeReady;
 export const selectBounds = (state: OceanStore) => state.bounds;

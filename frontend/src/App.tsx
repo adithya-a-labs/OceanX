@@ -1,11 +1,12 @@
 import { useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useOceanStore } from './store';
 import { MainLayout } from './components/layout';
 import { useGlobeBridge, useGlobeSync } from './hooks/useArgoSelection';
 import { demoDataHelpers } from './data/legacyAdapter';
 import { demoDataBasePath, loadDemoManifest } from './data/demoData';
 import { preloadNearbyFrames } from './data/preload';
-import { setDemoDataHelpers } from './hooks/useOceanData';
+import { setDemoDataHelpers, prefetchArgoComparison } from './hooks/useOceanData';
 import './globe';
 import type { OceanVariable, InitializeGlobe, GlobeInstance, ArgoMarker } from './types';
 
@@ -36,6 +37,7 @@ function OceanXApp() {
   const setIsLoadingArgoProfiles = useOceanStore((s) => s.setIsLoadingArgoProfiles);
   const selectedArgoId = useOceanStore((s) => s.selectedArgoId);
   const modelReady = useOceanStore((s) => s.manifest?.assetsReady ?? false);
+  const queryClient = useQueryClient();
 
   // Register the typed local-data adapter, then hydrate shared IDs from the manifest.
   useEffect(() => {
@@ -58,21 +60,12 @@ function OceanXApp() {
   }, []);
 
   // Selection from either the globe or dashboard drives the same comparison panel.
+  // React Query owns the data (keyed by observation id), so a float switched
+  // mid-flight simply resolves against a different key and nothing stale lands.
+  // Warming in an effect keeps the request off the render path.
   useEffect(() => {
-    if (!selectedArgoId || !modelReady) return;
-    let active = true;
-    useOceanStore.getState().setIsComparisonLoading(true);
-    demoDataHelpers.getComparison(selectedArgoId).then(comparison => {
-      if (active && useOceanStore.getState().selectedArgoId === selectedArgoId) {
-        useOceanStore.getState().setArgoComparison(comparison);
-      }
-    }).catch(error => {
-      if (active) useOceanStore.getState().setError(String(error));
-    }).finally(() => {
-      if (active) useOceanStore.getState().setIsComparisonLoading(false);
-    });
-    return () => { active = false; };
-  }, [selectedArgoId, modelReady]);
+    prefetchArgoComparison(queryClient, selectedArgoId, modelReady);
+  }, [queryClient, selectedArgoId, modelReady]);
 
   // Initialize globe bridge (KKJ will provide __OCEANX_GLOBE_INIT__)
   useGlobeBridge();

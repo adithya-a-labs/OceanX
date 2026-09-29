@@ -154,6 +154,17 @@ export class OceanLayerRenderer {
         const v01 = data[r1][c0];
         const v11 = data[r1][c1];
 
+        // A cell touching a missing value has no defined interpolation: lerping
+        // null yields NaN, and a NaN colour index would paint a bogus value.
+        // Leave the cell fully transparent instead of inventing data.
+        if (v00 === null || v10 === null || v01 === null || v11 === null) {
+          pixels[pIdx + 0] = 0;
+          pixels[pIdx + 1] = 0;
+          pixels[pIdx + 2] = 0;
+          pixels[pIdx + 3] = 0;
+          continue;
+        }
+
         const top = v00 * (1 - sfx) + v10 * sfx;
         const bottom = v01 * (1 - sfx) + v11 * sfx;
         const val = top * (1 - sfy) + bottom * sfy;
