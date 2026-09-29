@@ -114,13 +114,21 @@ export const Scrubber = ({
   const ratio = liveRatio ?? committedRatio;
   const displayed = clamp(liveRatio === null ? value : fromRatio(liveRatio), min, max);
 
-  // The idle thumb follows the committed value. A drag or a settle owns the
-  // transient ratio, so this must not clobber it.
+  const stopSettle = useCallback(() => {
+    if (settleRef.current) cancelAnimationFrame(settleRef.current);
+    settleRef.current = 0;
+    settlingRef.current = false;
+  }, []);
+
+  // The idle thumb follows the committed value. A drag owns the transient
+  // ratio, so this must not clobber it. If value changes externally or commits,
+  // cancel any settle and snap to the new value immediately.
   useEffect(() => {
-    if (draggingRef.current || settlingRef.current) return;
+    if (draggingRef.current) return;
+    stopSettle();
     liveRef.current = null;
     setLiveRatio(null);
-  }, [value]);
+  }, [value, stopSettle]);
 
   useEffect(
     () => () => {
@@ -149,16 +157,8 @@ export const Scrubber = ({
     publish(r);
   }, [publish]);
 
-  const stopSettle = useCallback(() => {
-    if (settleRef.current) cancelAnimationFrame(settleRef.current);
-    settleRef.current = 0;
-    settlingRef.current = false;
-  }, []);
-
-  // Glides the thumb from the release point to the value the consumer adopted.
-  // `onCommit` has already fired, so the store is authoritative and this only
-  // removes the jump.
-  const settle = useCallback(() => {
+  // Glides the thumb to the newly adopted target value.
+  const settle = useCallback((targetRatio?: number) => {
     stopSettle();
     const from = liveRef.current;
     if (prefersReducedMotion || from === null) {
@@ -166,8 +166,10 @@ export const Scrubber = ({
       setLiveRatio(null);
       return;
     }
-    const to = clampRatio(toRatioRef.current(valueRef.current));
-    if (Math.abs(to - from) < 0.001) {
+    const to = targetRatio !== undefined
+      ? clampRatio(targetRatio)
+      : clampRatio(toRatioRef.current(valueRef.current));
+    if (Math.abs(to - from) < 0.005) {
       liveRef.current = null;
       setLiveRatio(null);
       return;
@@ -177,11 +179,8 @@ export const Scrubber = ({
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / SETTLE_MS);
       const r = from + (to - from) * easeOutCubic(t);
-      // Report along the way so the caller's readout tracks the thumb instead
-      // of snapping to the level a frame before the thumb arrives.
       liveRef.current = r;
       setLiveRatio(r);
-      emitRef.current?.(clamp(fromRatioRef.current(r), min, max));
       if (t < 1) {
         settleRef.current = requestAnimationFrame(tick);
       } else {
@@ -192,7 +191,7 @@ export const Scrubber = ({
       }
     };
     settleRef.current = requestAnimationFrame(tick);
-  }, [min, max, prefersReducedMotion, stopSettle]);
+  }, [prefersReducedMotion, stopSettle]);
 
   const ratioFromClientX = useCallback((clientX: number) => {
     const rect = trackRef.current?.getBoundingClientRect();
@@ -210,13 +209,21 @@ export const Scrubber = ({
       pendingRef.current = null;
       draggingRef.current = true;
       setDragging(true);
-      // Capture keeps move/up flowing here even when the pointer leaves the hit
-      // area or the window.
+      // Capture keeps move/up flowing here even when the pointer leaves the hit area
       event.currentTarget.setPointerCapture(event.pointerId);
       const r = ratioFromClientX(event.clientX);
-      if (r !== undefined) publish(r);
+      if (r !== undefined) {
+        publish(r);
+        const rawVal = fromRatioRef.current(r);
+        const snappedVal = clamp(
+          step ? Math.round(rawVal / step) * step : rawVal,
+          min,
+          max,
+        );
+        emitRef.current?.(snappedVal);
+      }
     },
-    [disabled, publish, ratioFromClientX, stopSettle],
+    [disabled, max, min, publish, ratioFromClientX, step, stopSettle],
   );
 
   const handlePointerMove = useCallback(
@@ -239,18 +246,48 @@ export const Scrubber = ({
       }
       draggingRef.current = false;
       setDragging(false);
-      // Land on the exact pixel under the pointer before reporting, so the
-      // released value never lags a frame behind the thumb.
       const r = ratioFromClientX(event.clientX);
       cancelAnimationFrame(frameRef.current);
       frameRef.current = 0;
       pendingRef.current = null;
       const final = r ?? liveRef.current ?? committedRatio;
-      publish(final);
-      commitRef.current?.(clamp(fromRatioRef.current(final), min, max));
-      settle();
+      const rawVal = fromRatioRef.current(final);
+      const snappedVal = clamp(
+        step ? Math.round(rawVal / step) * step : rawVal,
+        min,
+        max,
+      );
+      const targetRatio = clampRatio(toRatioRef.current(snappedVal));
+      publish(targetRatio);
+      commitRef.current?.(snappedVal);
+      settle(targetRatio);
     },
-    [committedRatio, min, max, publish, ratioFromClientX, settle],
+    [committedRatio, min, max, publish, ratioFromClientX, settle, step],
+  );
+
+  const handleStationClick = useCallback(
+    (stationRatio: number) => {
+      if (disabled) return;
+      stopSettle();
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+      pendingRef.current = null;
+      draggingRef.current = false;
+      setDragging(false);
+
+      const targetRatio = clampRatio(stationRatio);
+      const rawVal = fromRatioRef.current(targetRatio);
+      const snappedVal = clamp(
+        step ? Math.round(rawVal / step) * step : rawVal,
+        min,
+        max,
+      );
+      liveRef.current = null;
+      setLiveRatio(null);
+      emitRef.current?.(snappedVal);
+      commitRef.current?.(snappedVal);
+    },
+    [disabled, max, min, step, stopSettle],
   );
 
   const stationIndex = useCallback(
@@ -396,6 +433,15 @@ export const Scrubber = ({
           className="pointer-events-none absolute -translate-x-1/2"
           style={{ left: `${percent}%` }}
         >
+          {/* Live floating tooltip pill above thumb while dragging */}
+          {dragging && (
+            <span
+              className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none z-10"
+            >
+              {valueText(displayed)}
+            </span>
+          )}
+
           {/* Solid fills only. Idle keeps a dark fill with a blue border so the
               thumb stays legible on top of the blue track fill; dragging
               inverts to a bright fill. */}
@@ -416,7 +462,7 @@ export const Scrubber = ({
       </div>
 
       {stations && tickLabels !== 'none' && (
-        <div className="relative mt-1 h-4" aria-hidden="true">
+        <div className="relative mt-1 h-5 flex items-center">
           {stations.map((s, i) => {
             if (!showLabel(i, stations.length)) return null;
             const isFirst = i === 0;
@@ -426,18 +472,23 @@ export const Scrubber = ({
             // the whole row and defeat the end-anchoring.
             const align = isFirst ? 'left-0' : isLast ? 'right-0' : '-translate-x-1/2';
             const style = isFirst || isLast ? undefined : { left: `${s.at * 100}%` };
+            const isActive = Math.abs(s.at - committedRatio) < 0.005;
             return (
-              <span
+              <button
                 key={`label-${s.at}-${i}`}
-                className={`absolute top-0 font-mono text-[10px] tabular-nums whitespace-nowrap ${
-                  Math.abs(s.at - committedRatio) < 0.005
-                    ? 'text-text-primary'
-                    : 'text-text-muted'
-                } ${align}`}
+                type="button"
+                onClick={() => handleStationClick(s.at)}
+                title={s.description}
                 style={style}
+                disabled={disabled}
+                className={`absolute top-0 font-mono text-[10px] tabular-nums whitespace-nowrap cursor-pointer transition-colors p-0.5 rounded hover:bg-surface-elevated ${
+                  isActive
+                    ? 'text-primary font-bold'
+                    : 'text-text-muted hover:text-text-primary'
+                } ${align}`}
               >
                 {s.label}
-              </span>
+              </button>
             );
           })}
         </div>

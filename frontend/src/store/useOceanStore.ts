@@ -33,6 +33,8 @@ interface OceanStore extends OceanViewState {
   setBounds: (bounds: OceanViewState['bounds']) => void;
   setShowArgo: (show: boolean) => void;
   setShowCurrents: (show: boolean) => void;
+  showCurrentScale: boolean;
+  setShowCurrentScale: (show: boolean) => void;
   setSelectedArgoId: (id: string | undefined) => void;
 
   // Note: comparison data is deliberately not stored here. It is fetched and
@@ -153,7 +155,12 @@ export const useOceanStore = create<OceanStore>()(
     }),
     setBounds: (bounds) => set({ bounds }),
     setShowArgo: (showArgo) => set({ showArgo }),
-    setShowCurrents: (showCurrents) => set({ showCurrents }),
+    showCurrentScale: false,
+    setShowCurrentScale: (showCurrentScale) => set({ showCurrentScale }),
+    setShowCurrents: (showCurrents) => set((state) => ({
+      showCurrents,
+      showCurrentScale: showCurrents ? state.showCurrentScale : false,
+    })),
     setSelectedArgoId: (id) => set((state) => updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, id || undefined)),
     selectArgo: (id) => set((state) => updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, id || undefined)),
     clearSelectedArgo: () => set((state) => updateSelectionWithRecents(state.selectedArgoId, state.recentArgoIds, undefined)),

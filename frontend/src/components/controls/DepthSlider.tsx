@@ -2,10 +2,18 @@ import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useOceanStore } from '../../store';
 import { Button, Scrubber, type ScrubberStation } from '../ui';
 import { Icons } from '../ui/Icon';
-import { formatDepth } from '../../utils/formatters';
 import type { DemoManifest } from '../../types/demoData';
 
 type DemoDepth = DemoManifest['depths'][number];
+
+const DEFAULT_DEPTHS: DemoDepth[] = [
+  { id: 'depth-0', requestedDepthM: 0, actualDepthM: 0.49 },
+  { id: 'depth-50', requestedDepthM: 50, actualDepthM: 47.37 },
+  { id: 'depth-100', requestedDepthM: 100, actualDepthM: 92.33 },
+  { id: 'depth-150', requestedDepthM: 150, actualDepthM: 142.50 },
+  { id: 'depth-200', requestedDepthM: 200, actualDepthM: 186.13 },
+  { id: 'depth-500', requestedDepthM: 500, actualDepthM: 541.09 },
+];
 
 export const DepthSlider = () => {
   const manifest = useOceanStore((s) => s.manifest);
@@ -13,14 +21,33 @@ export const DepthSlider = () => {
   const setDepth = useOceanStore((s) => s.setDepth);
   const [draftIndex, setDraftIndex] = useState<number | null>(null);
 
-  const levels = useMemo<DemoDepth[]>(
-    () => [...(manifest?.depths ?? [])].sort((a, b) => a.requestedDepthM - b.requestedDepthM),
-    [manifest],
-  );
+  // Standard oceanographic depth levels: 0, 50, 100, 150, 200, 500
+  const levels = useMemo<DemoDepth[]>(() => {
+    const raw = manifest?.depths && manifest.depths.length > 0 ? manifest.depths : DEFAULT_DEPTHS;
+    const depthsMap = new Map<number, DemoDepth>();
+    
+    // Seed with standard levels so 50, 100, 150, 200 are always present
+    DEFAULT_DEPTHS.forEach((d) => depthsMap.set(d.requestedDepthM, d));
+    // Overlay manifest values
+    raw.forEach((d) => depthsMap.set(d.requestedDepthM, d));
+
+    return Array.from(depthsMap.values()).sort((a, b) => a.requestedDepthM - b.requestedDepthM);
+  }, [manifest]);
 
   const currentIndex = useMemo(() => {
     const idx = levels.findIndex((d) => d.requestedDepthM === depth);
-    return idx >= 0 ? idx : 0;
+    if (idx >= 0) return idx;
+    // Find closest level if exact match not found
+    let closestIdx = 0;
+    let minDiff = Infinity;
+    levels.forEach((lvl, i) => {
+      const diff = Math.abs(lvl.requestedDepthM - depth);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = i;
+      }
+    });
+    return closestIdx;
   }, [levels, depth]);
 
   const span = Math.max(1, levels.length - 1);
@@ -30,7 +57,7 @@ export const DepthSlider = () => {
       levels.map((d, i) => ({
         at: i / span,
         label: d.requestedDepthM === 0 ? 'Surface' : `${d.requestedDepthM}m`,
-        description: `Model ${d.actualDepthM.toFixed(1)} m`,
+        description: `Nominal ${d.requestedDepthM} m (Actual ${d.actualDepthM.toFixed(1)} m)`,
       })),
     [levels, span],
   );
@@ -54,50 +81,37 @@ export const DepthSlider = () => {
   }, [depth]);
 
   const displayIndex = draftIndex ?? currentIndex;
-  const displayLevel = levels[displayIndex];
+  const displayLevel = levels[displayIndex] ?? levels[0];
   const disabled = levels.length <= 1;
-
-  if (levels.length === 0) {
-    return (
-      <div className="space-y-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
-          Depth
-        </span>
-        <p className="text-xs text-text-muted">Depth catalogue unavailable.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-2.5">
-      {/* Header with clear synchronized information */}
+      {/* Header with both requested depth and actual model depth */}
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
           Ocean Depth
         </span>
-        <span className="font-mono text-xs tabular-nums text-text-primary">
-          {displayLevel ? (
-            <>
-              <span className="font-bold text-primary">
-                {displayLevel.requestedDepthM === 0 ? 'Surface (0 m)' : `${displayLevel.requestedDepthM} m`}
-              </span>
-              <span className="text-text-muted ml-1.5 text-[11px]">
-                (model {displayLevel.actualDepthM.toFixed(1)} m)
-              </span>
-            </>
-          ) : (
-            formatDepth(depth)
-          )}
-        </span>
+        <div className="flex items-baseline gap-1.5 font-mono text-xs tabular-nums text-text-primary">
+          <span className="font-bold text-primary text-sm">
+            {displayLevel.requestedDepthM === 0 ? 'Surface (0 m)' : `${displayLevel.requestedDepthM} m`}
+          </span>
+          <span className="text-text-muted text-[11px]">
+            (actual {displayLevel.actualDepthM.toFixed(1)} m)
+          </span>
+        </div>
       </div>
 
-      {/* Discrete indexed Scrubber */}
+      {/* Discrete indexed Scrubber with live actual depth tooltip */}
       <Scrubber
         value={currentIndex}
         onValueChange={(v) => {
           const idx = Math.max(0, Math.min(levels.length - 1, Math.round(v)));
           setDraftIndex(idx);
+          const target = levels[idx];
+          if (target && target.requestedDepthM !== depth) {
+            setDepth(target.requestedDepthM);
+          }
         }}
         onCommit={(v) => {
           const idx = Math.max(0, Math.min(levels.length - 1, Math.round(v)));
@@ -117,9 +131,10 @@ export const DepthSlider = () => {
         valueText={(v) => {
           const idx = Math.max(0, Math.min(levels.length - 1, Math.round(v)));
           const lvl = levels[idx];
-          return lvl
-            ? `${formatDepth(lvl.requestedDepthM)}, model ${lvl.actualDepthM.toFixed(1)} m`
-            : formatDepth(depth);
+          if (!lvl) return `${depth} m`;
+          return lvl.requestedDepthM === 0
+            ? `Surface (${lvl.actualDepthM.toFixed(1)} m)`
+            : `${lvl.requestedDepthM} m (act: ${lvl.actualDepthM.toFixed(1)} m)`;
         }}
         tickLabels="all"
         disabled={disabled}
@@ -135,13 +150,16 @@ export const DepthSlider = () => {
               <button
                 key={lvl.id}
                 type="button"
-                onClick={() => setDepth(lvl.requestedDepthM)}
+                onClick={() => {
+                  setDraftIndex(null);
+                  setDepth(lvl.requestedDepthM);
+                }}
                 className={`px-2 py-1 rounded text-[10px] font-mono font-medium transition-all cursor-pointer whitespace-nowrap ${
                   isSelected
                     ? 'bg-primary text-primary-foreground font-bold shadow-sm'
                     : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:border-border-hover'
                 }`}
-                title={`Select depth level ${lvl.requestedDepthM}m (model: ${lvl.actualDepthM.toFixed(1)}m)`}
+                title={`Target: ${lvl.requestedDepthM}m · Actual: ${lvl.actualDepthM.toFixed(1)}m`}
               >
                 {lvl.requestedDepthM === 0 ? 'Surface' : `${lvl.requestedDepthM}m`}
               </button>

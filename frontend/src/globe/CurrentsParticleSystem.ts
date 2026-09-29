@@ -1,23 +1,47 @@
 /**
- * OceanX Cesium Currents Particle System
- * Animated ocean-current particle flow field rendered with Cesium PointPrimitiveCollection.
- * Consumes u/v vector components from CurrentsData and computes smooth particle trajectories.
+ * OceanX Cesium Currents Particle System - Windy.com Style (Region-Restricted & 3D-Anchored)
+ *
+ * Designed specifically to:
+ * 1. Confine wind and ocean currents strictly to the specified dataset region (Bay of Bengal)
+ *    with zero particles or trails rendered on the rest of the globe.
+ * 2. Render whisper-thin, silky, delicate streamline trails with luminous spark heads.
+ * 3. Lock trails directly to 3D geographic coordinates on the globe surface using per-frame
+ *    world-to-window projection, eliminating 2D screen persistence smearing or trails showing up
+ *    artificially when orbiting or moving the globe.
  */
 
 import * as Cesium from 'cesium';
 import type { CurrentsData } from '../types';
 
+interface TrailPoint {
+  lon: number;
+  lat: number;
+}
+
 interface Particle {
   lon: number;
   lat: number;
-  prevLon: number;
-  prevLat: number;
+  trail: TrailPoint[];
   age: number;
   maxAge: number;
   speed: number;
 }
 
-/** Samples a nullable u/v grid. Missing values yield 0 rather than NaN. */
+interface SpeedBin {
+  maxSpeed: number;
+  rgb: string;
+}
+
+// Curated Windy.com speed palette RGB definitions
+const SPEED_BINS: SpeedBin[] = [
+  { maxSpeed: 0.18, rgb: '56, 189, 248' },   // #38bdf8 Calm azure
+  { maxSpeed: 0.38, rgb: '34, 211, 238' },   // #22d3ee Electric cyan
+  { maxSpeed: 0.58, rgb: '52, 211, 153' },   // #34d399 Radiant mint / emerald
+  { maxSpeed: 0.82, rgb: '250, 204, 21' },   // #facc15 Vibrant golden amber
+  { maxSpeed: Infinity, rgb: '255, 255, 255' }, // Hot white / crest
+];
+
+/** Samples a nullable u/v grid using bilinear interpolation. Missing values yield 0. */
 function bilinear(
   grid: (number | null)[][],
   r0: number,
@@ -25,223 +49,541 @@ function bilinear(
   r1: number,
   c1: number,
   fx: number,
-  fy: number,
+  fy: number
 ): number {
-  const a = grid[r0][c0];
-  const b = grid[r0][c1];
-  const c = grid[r1][c0];
-  const d = grid[r1][c1];
-  if (a === null || b === null || c === null || d === null) return 0;
+  const a = grid[r0]?.[c0];
+  const b = grid[r0]?.[c1];
+  const c = grid[r1]?.[c0];
+  const d = grid[r1]?.[c1];
+  if (
+    a === null || a === undefined ||
+    b === null || b === undefined ||
+    c === null || c === undefined ||
+    d === null || d === undefined
+  ) {
+    return 0;
+  }
   return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
 }
 
 export class CurrentsParticleSystem {
   private viewer: Cesium.Viewer;
-  private pointsCollection: Cesium.PointPrimitiveCollection | null = null;
-  private particles: Particle[] = [];
-  private headPoints: Cesium.PointPrimitive[] = [];
-  private tailPoints: Cesium.PointPrimitive[] = [];
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
   private currentData: CurrentsData | null = null;
-  private removePreRenderListener: (() => void) | null = null;
+  private particles: Particle[] = [];
+  private particleCount = 1100; // Highly concentrated density inside specified region
+  private maxTrailLength = 16;  // Extended length for longer streamline trails
   private isVisible = false;
-  private particleCount = 1000;
   private isDisposed = false;
   private lastTime = 0;
 
+  // Listeners
+  private removePostRenderListener: (() => void) | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+
+  // Scratch objects for zero-allocation 60fps execution
+  private scratchNormal = new Cesium.Cartesian3();
+  private scratchCameraToPoint = new Cesium.Cartesian3();
+  private scratchCartesian = new Cesium.Cartesian3();
+  private scratchWindowCoord = new Cesium.Cartesian2();
+
   constructor(viewer: Cesium.Viewer) {
     this.viewer = viewer;
-    this.initCollection();
+
+    // Create full-screen canvas overlay
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'oceanx-windy-currents-canvas';
+    this.canvas.style.position = 'absolute';
+    this.canvas.style.top = '0';
+    this.canvas.style.left = '0';
+    this.canvas.style.width = '100%';
+    this.canvas.style.height = '100%';
+    this.canvas.style.pointerEvents = 'none';
+    this.canvas.style.zIndex = '1';
+    this.canvas.style.display = 'none';
+
+    // Mount canvas into Cesium viewer's container
+    const container = this.viewer.container as HTMLElement;
+    if (container) {
+      if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
+      container.appendChild(this.canvas);
+    }
+
+    const ctx = this.canvas.getContext('2d', { alpha: true });
+    if (!ctx) {
+      throw new Error('[CurrentsParticleSystem] Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+
+    this.resizeCanvas();
+    this.initParticles();
+    this.setupResizeListener();
     this.attachRenderLoop();
   }
 
-  private initCollection(): void {
-    const scene = this.viewer.scene;
-    this.pointsCollection = scene.primitives.add(new Cesium.PointPrimitiveCollection());
-    if (!this.pointsCollection) return;
+  public getCanvas(): HTMLCanvasElement | null {
+    return this.canvas;
+  }
 
-    this.pointsCollection.show = false;
+  private resizeCanvas(): void {
+    if (this.isDisposed || !this.viewer) return;
+    const container = this.viewer.container as HTMLElement;
+    const clientWidth = container?.clientWidth || window.innerWidth;
+    const clientHeight = container?.clientHeight || window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // Create particles and primitive points
-    for (let i = 0; i < this.particleCount; i++) {
-      const p = this.createRandomParticle();
-      this.particles.push(p);
+    const targetWidth = Math.floor(clientWidth * dpr);
+    const targetHeight = Math.floor(clientHeight * dpr);
 
-      const head = this.pointsCollection.add({
-        position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 2500),
-        color: Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.0),
-        pixelSize: 3.5,
-      });
-      this.headPoints.push(head);
-
-      const tail = this.pointsCollection.add({
-        position: Cesium.Cartesian3.fromDegrees(p.prevLon, p.prevLat, 2000),
-        color: Cesium.Color.fromCssColorString('#0ea5e9').withAlpha(0.0),
-        pixelSize: 2.0,
-      });
-      this.tailPoints.push(tail);
+    if (this.canvas.width !== targetWidth || this.canvas.height !== targetHeight) {
+      this.canvas.width = targetWidth;
+      this.canvas.height = targetHeight;
+      this.clearCanvas();
     }
   }
 
-  private createRandomParticle(): Particle {
-    const bounds = this.currentData?.bounds || { north: 18, south: 12, west: 82, east: 90 };
-    const lon = bounds.west + Math.random() * (bounds.east - bounds.west);
-    const lat = bounds.south + Math.random() * (bounds.north - bounds.south);
+  private clearCanvas(): void {
+    if (!this.ctx) return;
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  private setupResizeListener(): void {
+    const container = this.viewer.container as HTMLElement;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.resizeCanvas();
+      });
+      this.resizeObserver.observe(container);
+    }
+  }
+
+  private getBounds(): { north: number; south: number; west: number; east: number } {
+    return this.currentData?.bounds || { north: 18, south: 12, west: 82, east: 90 };
+  }
+
+  /**
+   * Returns circular boundary parameters on the globe surface centered in the region.
+   */
+  private getCircularBounds(): { centerLon: number; centerLat: number; radiusDeg: number; cosLat: number } {
+    const bounds = this.getBounds();
+    const centerLon = (bounds.west + bounds.east) / 2;
+    const centerLat = (bounds.north + bounds.south) / 2;
+    const cosLat = Math.max(0.1, Math.cos((centerLat * Math.PI) / 180));
+    const maxRadiusDegLat = (bounds.north - bounds.south) / 2;
+    const maxRadiusDegLon = ((bounds.east - bounds.west) / 2) * cosLat;
+    // Fit a true spherical circle inside the regional bounds
+    const radiusDeg = Math.min(maxRadiusDegLat, maxRadiusDegLon);
+    return { centerLon, centerLat, radiusDeg, cosLat };
+  }
+
+  /**
+   * Tests whether a geographic coordinate is within the circular boundary.
+   */
+  private isInsideCircularBounds(lon: number, lat: number): boolean {
+    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
+    const dx = (lon - centerLon) * cosLat;
+    const dy = lat - centerLat;
+    return dx * dx + dy * dy <= radiusDeg * radiusDeg;
+  }
+
+  /**
+   * Returns normalized radial distance from center [0..1+].
+   */
+  private getNormalizedRadius(lon: number, lat: number): number {
+    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
+    const dx = (lon - centerLon) * cosLat;
+    const dy = lat - centerLat;
+    return Math.hypot(dx, dy) / radiusDeg;
+  }
+
+  private initParticles(): void {
+    this.particles = [];
+    for (let i = 0; i < this.particleCount; i++) {
+      this.particles.push(this.spawnParticle());
+    }
+  }
+
+  private spawnParticle(): Particle {
+    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
+
+    // Uniform random distribution inside a disk: r = sqrt(random) * radius
+    const angle = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * radiusDeg * 0.95; // keep slightly inside boundary
+    const lon = centerLon + (r * Math.cos(angle)) / cosLat;
+    const lat = centerLat + r * Math.sin(angle);
 
     return {
       lon,
       lat,
-      prevLon: lon,
-      prevLat: lat,
-      age: Math.random() * 2.0,
-      maxAge: 1.8 + Math.random() * 2.2,
-      speed: 0.2,
+      trail: [{ lon, lat }],
+      age: Math.random() * 40, // Staggered start ages
+      maxAge: 70 + Math.random() * 60, // 70 to 130 frames lifetime for longer streamlets
+      speed: 0.25,
     };
+  }
+
+  /**
+   * Samples velocity at (lon, lat) strictly from within the circular boundary.
+   * If outside circular bounds, returns 0 velocity so particles are culled.
+   */
+  private sampleVelocity(lon: number, lat: number): { u: number; v: number } {
+    const bounds = this.getBounds();
+
+    // Strict circular boundary check
+    if (!this.isInsideCircularBounds(lon, lat)) {
+      return { u: 0, v: 0 };
+    }
+
+    if (this.currentData && this.currentData.u && this.currentData.u.length > 0) {
+      const { u, v } = this.currentData;
+      const rows = u.length;
+      const cols = u[0].length;
+
+      const normX = (lon - bounds.west) / (bounds.east - bounds.west);
+      const normY = (bounds.north - lat) / (bounds.north - bounds.south);
+
+      const gx = normX * (cols - 1);
+      const gy = normY * (rows - 1);
+
+      const c0 = Math.floor(gx);
+      const c1 = Math.min(cols - 1, c0 + 1);
+      const r0 = Math.floor(gy);
+      const r1 = Math.min(rows - 1, r0 + 1);
+
+      const fx = gx - c0;
+      const fy = gy - r0;
+
+      const uInterp = bilinear(u, r0, c0, r1, c1, fx, fy);
+      const vInterp = bilinear(v, r0, c0, r1, c1, fx, fy);
+
+      return { u: uInterp, v: vInterp };
+    }
+
+    // Default Bay of Bengal cyclonic gyre circulation fallback if grid is not yet loaded
+    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
+    const dx = ((lon - centerLon) * cosLat) / radiusDeg;
+    const dy = (lat - centerLat) / radiusDeg;
+    const radius = Math.hypot(dx, dy);
+    const gyreStrength = Math.exp(-Math.pow(radius - 0.65, 2) / 0.35) * 0.45;
+    const uVal = dy * gyreStrength;
+    const vVal = -dx * gyreStrength;
+    return { u: uVal, v: vVal };
   }
 
   public updateCurrents(data: CurrentsData): void {
     this.currentData = data;
-    // Respawn existing particles smoothly within new bounds
-    for (const p of this.particles) {
-      const bounds = data.bounds;
-      p.lon = bounds.west + Math.random() * (bounds.east - bounds.west);
-      p.lat = bounds.south + Math.random() * (bounds.north - bounds.south);
-      p.prevLon = p.lon;
-      p.prevLat = p.lat;
-      p.age = Math.random() * p.maxAge;
+    // Reseed particles strictly within the updated bounds
+    for (let i = 0; i < this.particles.length; i++) {
+      this.particles[i] = this.spawnParticle();
     }
+    this.clearCanvas();
   }
 
   public setShow(show: boolean): void {
     this.isVisible = show;
-    if (this.pointsCollection) {
-      this.pointsCollection.show = show;
-    }
-    if (show && !this.lastTime) {
+    this.canvas.style.display = show ? 'block' : 'none';
+    if (!show) {
+      this.clearCanvas();
+    } else {
+      this.resizeCanvas();
       this.lastTime = performance.now();
+      this.viewer.scene.requestRender();
     }
   }
 
-  private sampleVelocity(lon: number, lat: number): { u: number; v: number } {
-    if (!this.currentData || !this.currentData.u || this.currentData.u.length === 0) {
-      return { u: 0.1, v: 0.1 };
-    }
-
-    const { bounds, u, v } = this.currentData;
-    const rows = u.length;
-    const cols = u[0].length;
-
-    // Fractional coordinates in grid
-    const normX = (lon - bounds.west) / (bounds.east - bounds.west);
-    const normY = (bounds.north - lat) / (bounds.north - bounds.south);
-
-    if (normX < 0 || normX > 1 || normY < 0 || normY > 1) {
-      return { u: 0, v: 0 };
-    }
-
-    const gx = normX * (cols - 1);
-    const gy = normY * (rows - 1);
-
-    const c0 = Math.floor(gx);
-    const c1 = Math.min(cols - 1, c0 + 1);
-    const r0 = Math.floor(gy);
-    const r1 = Math.min(rows - 1, r0 + 1);
-
-    const fx = gx - c0;
-    const fy = gy - r0;
-
-    // Bilinear interpolation for u and v. A cell touching a missing value has no
-    // defined interpolation, so it samples as zero velocity and the particle
-    // stalls there rather than being given an invented direction.
-    const uInterp = bilinear(u, r0, c0, r1, c1, fx, fy);
-    const vInterp = bilinear(v, r0, c0, r1, c1, fx, fy);
-
-    return { u: uInterp, v: vInterp };
+  private isPointFacingCamera(cartesian: Cesium.Cartesian3, cameraPosition: Cesium.Cartesian3): boolean {
+    Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(cartesian, this.scratchNormal);
+    Cesium.Cartesian3.subtract(cameraPosition, cartesian, this.scratchCameraToPoint);
+    return Cesium.Cartesian3.dot(this.scratchNormal, this.scratchCameraToPoint) > 0;
   }
 
   private attachRenderLoop(): void {
-    const onPreRender = () => {
-      if (this.isDisposed || !this.isVisible || !this.pointsCollection) return;
+    const onPostRender = () => {
+      if (this.isDisposed || !this.isVisible) return;
 
       const now = performance.now();
-      const dt = Math.min(0.05, (now - (this.lastTime || now)) / 1000);
+      const dt = Math.min(0.04, (now - (this.lastTime || now)) / 1000);
       this.lastTime = now;
 
-      const bounds = this.currentData?.bounds || { north: 18, south: 12, west: 82, east: 90 };
-      const speedScale = 0.95; // Visual scaling factor for particle speed
-
-      for (let i = 0; i < this.particleCount; i++) {
-        const p = this.particles[i];
-        const head = this.headPoints[i];
-        const tail = this.tailPoints[i];
-
-        p.prevLon = p.lon;
-        p.prevLat = p.lat;
-
-        const { u, v } = this.sampleVelocity(p.lon, p.lat);
-        p.speed = Math.hypot(u, v);
-
-        // Convert velocity to geographic displacement
-        const cosLat = Math.max(0.1, Math.cos((p.lat * Math.PI) / 180));
-        const dLon = ((u * speedScale) / cosLat) * dt;
-        const dLat = v * speedScale * dt;
-
-        p.lon += dLon;
-        p.lat += dLat;
-        p.age += dt;
-
-        // Check if out of bounds or exceeded max age
-        const isOutOfBounds =
-          p.lon < bounds.west ||
-          p.lon > bounds.east ||
-          p.lat < bounds.south ||
-          p.lat > bounds.north;
-
-        if (isOutOfBounds || p.age >= p.maxAge) {
-          p.lon = bounds.west + Math.random() * (bounds.east - bounds.west);
-          p.lat = bounds.south + Math.random() * (bounds.north - bounds.south);
-          p.prevLon = p.lon;
-          p.prevLat = p.lat;
-          p.age = 0;
-          p.maxAge = 1.8 + Math.random() * 2.2;
-        }
-
-        // Life alpha fade curve: sin(0 to PI)
-        const lifeFraction = p.age / p.maxAge;
-        const alpha = Math.sin(lifeFraction * Math.PI);
-
-        // Color based on speed: fast particles brighter white/cyan
-        const speedNorm = Math.min(1.0, p.speed / 0.5);
-        const r = Math.round(34 + speedNorm * 180);
-        const g = Math.round(211 + speedNorm * 44);
-        const b = 255;
-
-        // Update Cesium primitives in-place
-        head.position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 2500);
-        head.color = new Cesium.Color(r / 255, g / 255, b / 255, alpha * 0.95);
-
-        tail.position = Cesium.Cartesian3.fromDegrees(p.prevLon, p.prevLat, 2000);
-        tail.color = new Cesium.Color(14 / 255, 165 / 255, 233 / 255, alpha * 0.45);
-      }
+      this.renderFrame(dt);
     };
 
-    const removeListener = this.viewer.scene.preRender.addEventListener(onPreRender);
-    this.removePreRenderListener = () => {
+    const removeListener = this.viewer.scene.postRender.addEventListener(onPostRender);
+    this.removePostRenderListener = () => {
       removeListener();
     };
   }
 
+  /**
+   * Main per-frame 3D-anchored streamline animation loop.
+   * Completely redraws trails directly from their 3D geographic coordinates every frame.
+   * Eliminates 2D screen persistence, smearing, and camera movement artifacts.
+   */
+  private renderFrame(dt: number): void {
+    const ctx = this.ctx;
+    const canvasW = this.canvas.width;
+    const canvasH = this.canvas.height;
+    if (canvasW === 0 || canvasH === 0) return;
+
+    // Clear entire canvas so trails are 100% anchored to the 3D globe with no screen-space ghosting
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const scene = this.viewer.scene;
+    const cameraPosition = scene.camera.positionWC;
+    const speedScale = 1.15; // Geographic advection multiplier for extended streamline reach
+
+    // Prepare batched segment buckets for 5 speed bins to minimize draw calls
+    interface Segment {
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+      alpha: number;
+    }
+
+    interface Bead {
+      x: number;
+      y: number;
+      alpha: number;
+    }
+
+    interface BinData {
+      tailSegments: Segment[];
+      midSegments: Segment[];
+      headSegments: Segment[];
+      beads: Bead[];
+    }
+
+    const bins: BinData[] = SPEED_BINS.map(() => ({
+      tailSegments: [],
+      midSegments: [],
+      headSegments: [],
+      beads: [],
+    }));
+
+    for (let i = 0; i < this.particleCount; i++) {
+      const p = this.particles[i];
+
+      // 2nd-Order Runge-Kutta (RK2) Advection
+      const v1 = this.sampleVelocity(p.lon, p.lat);
+      const cosLat1 = Math.max(0.12, Math.cos((p.lat * Math.PI) / 180));
+      const midLon = p.lon + (v1.u * speedScale * dt * 0.5) / cosLat1;
+      const midLat = p.lat + v1.v * speedScale * dt * 0.5;
+
+      const v2 = this.sampleVelocity(midLon, midLat);
+      const cosLat2 = Math.max(0.12, Math.cos((midLat * Math.PI) / 180));
+      p.lon += (v2.u * speedScale * dt) / cosLat2;
+      p.lat += v2.v * speedScale * dt;
+      p.speed = Math.hypot(v2.u, v2.v);
+      p.age += 1;
+
+      // Append current geographic position to trail history
+      p.trail.push({ lon: p.lon, lat: p.lat });
+      if (p.trail.length > this.maxTrailLength) {
+        p.trail.shift();
+      }
+
+      // Check strictly if particle left the circular boundary or exceeded lifetime
+      const isOutOfBounds = !this.isInsideCircularBounds(p.lon, p.lat);
+
+      if (p.age >= p.maxAge || isOutOfBounds || p.speed < 0.02) {
+        this.particles[i] = this.spawnParticle();
+        continue;
+      }
+
+      // Horizon culling: check if particle is on the hemisphere facing camera
+      Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 1500, Cesium.Ellipsoid.WGS84, this.scratchCartesian);
+      if (!this.isPointFacingCamera(this.scratchCartesian, cameraPosition)) {
+        continue;
+      }
+
+      // Need at least 2 points to draw a streamline
+      const trail = p.trail;
+      const trailLen = trail.length;
+      if (trailLen < 2) continue;
+
+      // Project all trail points from 3D world coordinates to screen pixels
+      const screenPoints: Array<{ x: number; y: number }> = [];
+      let isOffscreen = true;
+
+      for (let t = 0; t < trailLen; t++) {
+        Cesium.Cartesian3.fromDegrees(
+          trail[t].lon,
+          trail[t].lat,
+          1500,
+          Cesium.Ellipsoid.WGS84,
+          this.scratchCartesian
+        );
+        const win = Cesium.SceneTransforms.worldToWindowCoordinates(
+          scene,
+          this.scratchCartesian,
+          this.scratchWindowCoord
+        );
+        if (!win) {
+          screenPoints.length = 0;
+          break;
+        }
+
+        const px = win.x * dpr;
+        const py = win.y * dpr;
+        screenPoints.push({ x: px, y: py });
+
+        if (px >= 0 && px <= canvasW && py >= 0 && py <= canvasH) {
+          isOffscreen = false;
+        }
+      }
+
+      if (isOffscreen || screenPoints.length < 2) continue;
+
+      // Check for projection discontinuity jump (e.g. crossing camera frustum edges)
+      let hasJump = false;
+      for (let s = 1; s < screenPoints.length; s++) {
+        const dx = screenPoints[s].x - screenPoints[s - 1].x;
+        const dy = screenPoints[s].y - screenPoints[s - 1].y;
+        if (dx * dx + dy * dy > 8000) {
+          hasJump = true;
+          break;
+        }
+      }
+      if (hasJump) continue;
+
+      // Determine speed bin
+      let binIdx = 0;
+      for (let b = 0; b < SPEED_BINS.length; b++) {
+        if (p.speed <= SPEED_BINS[b].maxSpeed) {
+          binIdx = b;
+          break;
+        }
+      }
+      const bin = bins[binIdx];
+
+      // Smooth lifespan alpha envelope combined with smooth radial boundary fade
+      const lifeFraction = p.age / p.maxAge;
+      const normR = this.getNormalizedRadius(p.lon, p.lat);
+      // Soft edge falloff as particles approach the circular perimeter
+      const edgeFade = normR > 0.82 ? Math.max(0, 1 - (normR - 0.82) / 0.18) : 1;
+      const lifeAlpha = Math.sin(lifeFraction * Math.PI) * edgeFade;
+
+      // Distribute trail points into Tail, Mid, and Head segments for smooth tapering
+      const numPts = screenPoints.length;
+      for (let s = 1; s < numPts; s++) {
+        const p0 = screenPoints[s - 1];
+        const p1 = screenPoints[s];
+        const segmentFraction = s / (numPts - 1); // 0 at tail, 1 at head
+
+        if (segmentFraction <= 0.35) {
+          bin.tailSegments.push({
+            x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y,
+            alpha: 0.22 * lifeAlpha,
+          });
+        } else if (segmentFraction <= 0.70) {
+          bin.midSegments.push({
+            x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y,
+            alpha: 0.55 * lifeAlpha,
+          });
+        } else {
+          bin.headSegments.push({
+            x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y,
+            alpha: 0.88 * lifeAlpha,
+          });
+        }
+      }
+
+      // Delicate glowing spark bead at the leading tip of each streamlet
+      const headPt = screenPoints[numPts - 1];
+      bin.beads.push({
+        x: headPt.x,
+        y: headPt.y,
+        alpha: Math.min(1.0, lifeAlpha * 0.95),
+      });
+    }
+
+    // Render batched segments with whisper-thin refined widths
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let b = 0; b < SPEED_BINS.length; b++) {
+      const speedDef = SPEED_BINS[b];
+      const bin = bins[b];
+
+      // 1. Tail segments: whisper-thin (0.55px * dpr)
+      if (bin.tailSegments.length > 0) {
+        ctx.beginPath();
+        for (let s = 0; s < bin.tailSegments.length; s++) {
+          const seg = bin.tailSegments[s];
+          ctx.moveTo(seg.x0, seg.y0);
+          ctx.lineTo(seg.x1, seg.y1);
+        }
+        ctx.strokeStyle = `rgba(${speedDef.rgb}, 0.22)`;
+        ctx.lineWidth = 0.55 * dpr;
+        ctx.stroke();
+      }
+
+      // 2. Mid segments: delicate (0.75px * dpr)
+      if (bin.midSegments.length > 0) {
+        ctx.beginPath();
+        for (let s = 0; s < bin.midSegments.length; s++) {
+          const seg = bin.midSegments[s];
+          ctx.moveTo(seg.x0, seg.y0);
+          ctx.lineTo(seg.x1, seg.y1);
+        }
+        ctx.strokeStyle = `rgba(${speedDef.rgb}, 0.55)`;
+        ctx.lineWidth = 0.75 * dpr;
+        ctx.stroke();
+      }
+
+      // 3. Head segments: sleek streamlet line (0.95px * dpr)
+      if (bin.headSegments.length > 0) {
+        ctx.beginPath();
+        for (let s = 0; s < bin.headSegments.length; s++) {
+          const seg = bin.headSegments[s];
+          ctx.moveTo(seg.x0, seg.y0);
+          ctx.lineTo(seg.x1, seg.y1);
+        }
+        ctx.strokeStyle = `rgba(${speedDef.rgb}, 0.88)`;
+        ctx.lineWidth = 0.95 * dpr;
+        ctx.stroke();
+      }
+
+      // 4. Luminous spark head beads (0.85px radius * dpr)
+      if (bin.beads.length > 0) {
+        ctx.beginPath();
+        const r = 0.85 * dpr;
+        for (let s = 0; s < bin.beads.length; s++) {
+          const bead = bin.beads[s];
+          ctx.moveTo(bead.x + r, bead.y);
+          ctx.arc(bead.x, bead.y, r, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = `rgba(${speedDef.rgb}, 0.95)`;
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
   public dispose(): void {
     this.isDisposed = true;
-    if (this.removePreRenderListener) {
-      this.removePreRenderListener();
-      this.removePreRenderListener = null;
+
+    if (this.removePostRenderListener) {
+      this.removePostRenderListener();
+      this.removePostRenderListener = null;
     }
-    if (this.pointsCollection) {
-      this.viewer.scene.primitives.remove(this.pointsCollection);
-      this.pointsCollection = null;
+
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
+
+    if (this.canvas && this.canvas.parentElement) {
+      this.canvas.parentElement.removeChild(this.canvas);
+    }
+
     this.particles = [];
-    this.headPoints = [];
-    this.tailPoints = [];
   }
 }

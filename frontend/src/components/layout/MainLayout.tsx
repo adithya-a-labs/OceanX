@@ -1,6 +1,7 @@
 import { useOceanStore } from '../../store';
 import { ControlPanel } from './ControlPanel';
 import { ArgoPanel, RecentArgoFloats } from '../panels';
+import { WindySpeedBadge } from '../globe/WindySpeedBadge';
 import { Icons, Icon } from '../ui/Icon';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useCallback } from 'react';
@@ -53,6 +54,9 @@ export const MainLayout = () => {
 
       {/* Recent Argo Floats Floating Dock */}
       <RecentArgoFloats />
+
+      {/* Windy.com Style Live Currents Velocity Badge */}
+      <WindySpeedBadge />
 
       {/* Global error banner */}
       <AnimatePresence>
