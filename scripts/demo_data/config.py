@@ -5,11 +5,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw"
 OUTPUT = ROOT / "frontend" / "public" / "demo-data"
-PRODUCT_ID = "GLOBAL_MULTIYEAR_PHY_001_030"
-DATASET_ID = "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+PRODUCT_ID = "GLOBAL_ANALYSISFORECAST_PHY_001_024"
+DATASET_IDS = {
+    "temperature": "cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m",
+    "salinity": "cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m",
+    "currents": "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m",
+}
+DATASET_ID = DATASET_IDS["temperature"]  # Existing single-ID manifest field.
 REGION = {"name": "Bay of Bengal", "south": 10, "north": 20, "west": 80, "east": 92}
+RENDER_REGION = {"south": 7, "north": 22, "west": 77, "east": 96}
 DATES = ("2025-04-20", "2025-04-21", "2025-04-22", "2025-04-23")
-REQUESTED_DEPTHS = (0, 50, 100, 200, 500)
+REQUESTED_DEPTHS = (0, 50, 100, 150, 200, 500)
 VARIABLE_STANDARDS = {
     "temperature": "sea_water_potential_temperature",
     "salinity": "sea_water_salinity",

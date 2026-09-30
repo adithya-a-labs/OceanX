@@ -1,8 +1,8 @@
 /**
- * OceanX Cesium Currents Particle System - Windy.com Style (Region-Restricted & 3D-Anchored)
+ * OceanX Cesium Currents Particle System - Region-Restricted & 3D-Anchored
  *
  * Designed specifically to:
- * 1. Confine wind and ocean currents strictly to the specified dataset region (Bay of Bengal)
+ * 1. Confine ocean currents to valid cells in the dataset region (Bay of Bengal)
  *    with zero particles or trails rendered on the rest of the globe.
  * 2. Render whisper-thin, silky, delicate streamline trails with luminous spark heads.
  * 3. Lock trails directly to 3D geographic coordinates on the globe surface using per-frame
@@ -41,7 +41,7 @@ const SPEED_BINS: SpeedBin[] = [
   { maxSpeed: Infinity, rgb: '255, 255, 255' }, // Hot white / crest
 ];
 
-/** Samples a nullable u/v grid using bilinear interpolation. Missing values yield 0. */
+/** Samples a nullable u/v grid using bilinear interpolation. Missing values remain invalid. */
 function bilinear(
   grid: (number | null)[][],
   r0: number,
@@ -50,7 +50,7 @@ function bilinear(
   c1: number,
   fx: number,
   fy: number
-): number {
+): number | null {
   const a = grid[r0]?.[c0];
   const b = grid[r0]?.[c1];
   const c = grid[r1]?.[c0];
@@ -59,9 +59,10 @@ function bilinear(
     a === null || a === undefined ||
     b === null || b === undefined ||
     c === null || c === undefined ||
-    d === null || d === undefined
+    d === null || d === undefined ||
+    !Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || !Number.isFinite(d)
   ) {
-    return 0;
+    return null;
   }
   return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
 }
@@ -72,7 +73,8 @@ export class CurrentsParticleSystem {
   private ctx: CanvasRenderingContext2D;
   private currentData: CurrentsData | null = null;
   private particles: Particle[] = [];
-  private particleCount = 1100; // Highly concentrated density inside specified region
+  private validCells: Array<{ row: number; column: number }> = [];
+  private particleCount = 1100;
   private maxTrailLength = 16;  // Extended length for longer streamline trails
   private isVisible = false;
   private isDisposed = false;
@@ -119,7 +121,6 @@ export class CurrentsParticleSystem {
     this.ctx = ctx;
 
     this.resizeCanvas();
-    this.initParticles();
     this.setupResizeListener();
     this.attachRenderLoop();
   }
@@ -160,60 +161,36 @@ export class CurrentsParticleSystem {
     }
   }
 
-  private getBounds(): { north: number; south: number; west: number; east: number } {
-    return this.currentData?.bounds || { north: 18, south: 12, west: 82, east: 90 };
+  private hasValidVector(row: number, column: number): boolean {
+    const data = this.currentData;
+    if (!data) return false;
+    const u = data.u[row]?.[column];
+    const v = data.v[row]?.[column];
+    return u !== null && u !== undefined && Number.isFinite(u) &&
+      v !== null && v !== undefined && Number.isFinite(v);
   }
 
-  /**
-   * Returns circular boundary parameters on the globe surface centered in the region.
-   */
-  private getCircularBounds(): { centerLon: number; centerLat: number; radiusDeg: number; cosLat: number } {
-    const bounds = this.getBounds();
-    const centerLon = (bounds.west + bounds.east) / 2;
-    const centerLat = (bounds.north + bounds.south) / 2;
-    const cosLat = Math.max(0.1, Math.cos((centerLat * Math.PI) / 180));
-    const maxRadiusDegLat = (bounds.north - bounds.south) / 2;
-    const maxRadiusDegLon = ((bounds.east - bounds.west) / 2) * cosLat;
-    // Fit a true spherical circle inside the regional bounds
-    const radiusDeg = Math.min(maxRadiusDegLat, maxRadiusDegLon);
-    return { centerLon, centerLat, radiusDeg, cosLat };
-  }
-
-  /**
-   * Tests whether a geographic coordinate is within the circular boundary.
-   */
-  private isInsideCircularBounds(lon: number, lat: number): boolean {
-    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
-    const dx = (lon - centerLon) * cosLat;
-    const dy = lat - centerLat;
-    return dx * dx + dy * dy <= radiusDeg * radiusDeg;
-  }
-
-  /**
-   * Returns normalized radial distance from center [0..1+].
-   */
-  private getNormalizedRadius(lon: number, lat: number): number {
-    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
-    const dx = (lon - centerLon) * cosLat;
-    const dy = lat - centerLat;
-    return Math.hypot(dx, dy) / radiusDeg;
+  private isInsideBounds(lon: number, lat: number): boolean {
+    const bounds = this.currentData?.bounds;
+    return !!bounds && lon >= bounds.west && lon <= bounds.east &&
+      lat >= bounds.south && lat <= bounds.north;
   }
 
   private initParticles(): void {
-    this.particles = [];
-    for (let i = 0; i < this.particleCount; i++) {
-      this.particles.push(this.spawnParticle());
-    }
+    this.particles = this.validCells.length
+      ? Array.from({ length: this.particleCount }, () => this.spawnParticle()) : [];
   }
 
   private spawnParticle(): Particle {
-    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
-
-    // Uniform random distribution inside a disk: r = sqrt(random) * radius
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * radiusDeg * 0.95; // keep slightly inside boundary
-    const lon = centerLon + (r * Math.cos(angle)) / cosLat;
-    const lat = centerLat + r * Math.sin(angle);
+    const data = this.currentData!;
+    const { row, column } = this.validCells[Math.floor(Math.random() * this.validCells.length)];
+    const rows = data.u.length;
+    const columns = data.u[0].length;
+    // Every valid regular-grid cell has equal probability; land cells are absent.
+    const lon = data.bounds.west + (column + Math.random()) / (columns - 1) *
+      (data.bounds.east - data.bounds.west);
+    const lat = data.bounds.north - (row + Math.random()) / (rows - 1) *
+      (data.bounds.north - data.bounds.south);
 
     return {
       lon,
@@ -226,19 +203,13 @@ export class CurrentsParticleSystem {
   }
 
   /**
-   * Samples velocity at (lon, lat) strictly from within the circular boundary.
-   * If outside circular bounds, returns 0 velocity so particles are culled.
+   * Samples velocity only where the real grid defines all surrounding vectors.
    */
-  private sampleVelocity(lon: number, lat: number): { u: number; v: number } {
-    const bounds = this.getBounds();
+  private sampleVelocity(lon: number, lat: number): { u: number; v: number } | null {
+    if (!this.isInsideBounds(lon, lat)) return null;
 
-    // Strict circular boundary check
-    if (!this.isInsideCircularBounds(lon, lat)) {
-      return { u: 0, v: 0 };
-    }
-
-    if (this.currentData && this.currentData.u && this.currentData.u.length > 0) {
-      const { u, v } = this.currentData;
+    if (this.currentData && this.currentData.u.length > 1 && this.currentData.v.length > 1) {
+      const { u, v, bounds } = this.currentData;
       const rows = u.length;
       const cols = u[0].length;
 
@@ -259,26 +230,23 @@ export class CurrentsParticleSystem {
       const uInterp = bilinear(u, r0, c0, r1, c1, fx, fy);
       const vInterp = bilinear(v, r0, c0, r1, c1, fx, fy);
 
-      return { u: uInterp, v: vInterp };
+      return uInterp === null || vInterp === null ? null : { u: uInterp, v: vInterp };
     }
-
-    // Default Bay of Bengal cyclonic gyre circulation fallback if grid is not yet loaded
-    const { centerLon, centerLat, radiusDeg, cosLat } = this.getCircularBounds();
-    const dx = ((lon - centerLon) * cosLat) / radiusDeg;
-    const dy = (lat - centerLat) / radiusDeg;
-    const radius = Math.hypot(dx, dy);
-    const gyreStrength = Math.exp(-Math.pow(radius - 0.65, 2) / 0.35) * 0.45;
-    const uVal = dy * gyreStrength;
-    const vVal = -dx * gyreStrength;
-    return { u: uVal, v: vVal };
+    return null;
   }
 
   public updateCurrents(data: CurrentsData): void {
     this.currentData = data;
-    // Reseed particles strictly within the updated bounds
-    for (let i = 0; i < this.particles.length; i++) {
-      this.particles[i] = this.spawnParticle();
+    this.validCells = [];
+    for (let row = 0; row < data.u.length - 1; row++) {
+      for (let column = 0; column < data.u[row].length - 1; column++) {
+        if (this.hasValidVector(row, column) && this.hasValidVector(row + 1, column) &&
+            this.hasValidVector(row, column + 1) && this.hasValidVector(row + 1, column + 1)) {
+          this.validCells.push({ row, column });
+        }
+      }
     }
+    this.initParticles();
     this.clearCanvas();
   }
 
@@ -365,19 +333,33 @@ export class CurrentsParticleSystem {
       beads: [],
     }));
 
-    for (let i = 0; i < this.particleCount; i++) {
+    for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
 
       // 2nd-Order Runge-Kutta (RK2) Advection
       const v1 = this.sampleVelocity(p.lon, p.lat);
+      if (!v1) {
+        this.particles[i] = this.spawnParticle();
+        continue;
+      }
       const cosLat1 = Math.max(0.12, Math.cos((p.lat * Math.PI) / 180));
       const midLon = p.lon + (v1.u * speedScale * dt * 0.5) / cosLat1;
       const midLat = p.lat + v1.v * speedScale * dt * 0.5;
 
       const v2 = this.sampleVelocity(midLon, midLat);
+      if (!v2) {
+        this.particles[i] = this.spawnParticle();
+        continue;
+      }
       const cosLat2 = Math.max(0.12, Math.cos((midLat * Math.PI) / 180));
-      p.lon += (v2.u * speedScale * dt) / cosLat2;
-      p.lat += v2.v * speedScale * dt;
+      const nextLon = p.lon + (v2.u * speedScale * dt) / cosLat2;
+      const nextLat = p.lat + v2.v * speedScale * dt;
+      if (!this.sampleVelocity(nextLon, nextLat)) {
+        this.particles[i] = this.spawnParticle();
+        continue;
+      }
+      p.lon = nextLon;
+      p.lat = nextLat;
       p.speed = Math.hypot(v2.u, v2.v);
       p.age += 1;
 
@@ -387,10 +369,7 @@ export class CurrentsParticleSystem {
         p.trail.shift();
       }
 
-      // Check strictly if particle left the circular boundary or exceeded lifetime
-      const isOutOfBounds = !this.isInsideCircularBounds(p.lon, p.lat);
-
-      if (p.age >= p.maxAge || isOutOfBounds || p.speed < 0.02) {
+      if (p.age >= p.maxAge) {
         this.particles[i] = this.spawnParticle();
         continue;
       }
@@ -461,12 +440,9 @@ export class CurrentsParticleSystem {
       }
       const bin = bins[binIdx];
 
-      // Smooth lifespan alpha envelope combined with smooth radial boundary fade
+      // Smooth lifespan alpha envelope across the full valid-water patch
       const lifeFraction = p.age / p.maxAge;
-      const normR = this.getNormalizedRadius(p.lon, p.lat);
-      // Soft edge falloff as particles approach the circular perimeter
-      const edgeFade = normR > 0.82 ? Math.max(0, 1 - (normR - 0.82) / 0.18) : 1;
-      const lifeAlpha = Math.sin(lifeFraction * Math.PI) * edgeFade;
+      const lifeAlpha = Math.sin(lifeFraction * Math.PI);
 
       // Distribute trail points into Tail, Mid, and Head segments for smooth tapering
       const numPts = screenPoints.length;
@@ -585,5 +561,6 @@ export class CurrentsParticleSystem {
     }
 
     this.particles = [];
+    this.validCells = [];
   }
 }

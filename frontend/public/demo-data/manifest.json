@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "assetsReady": false,
+  "assetsReady": true,
   "region": {
     "name": "Bay of Bengal",
     "south": 10,
@@ -10,10 +10,15 @@
   },
   "model": {
     "provider": "Copernicus Marine",
-    "productId": "GLOBAL_MULTIYEAR_PHY_001_030",
-    "datasetId": "cmems_mod_glo_phy_my_0.083deg_P1D-m",
-    "datasetVersion": "202311",
-    "doi": "10.48670/moi-00021"
+    "productId": "GLOBAL_ANALYSISFORECAST_PHY_001_024",
+    "datasetId": "cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m",
+    "datasetVersion": "202406",
+    "datasetIds": {
+      "temperature": "cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m",
+      "salinity": "cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m",
+      "currents": "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
+    },
+    "doi": "10.48670/moi-00016"
   },
   "plannedDates": [
     "2025-04-20",
@@ -24,23 +29,19 @@
   "times": [
     {
       "id": "t0",
-      "iso": "2025-04-20T00:00:00Z",
-      "status": "planned"
+      "iso": "2025-04-20T00:00:00Z"
     },
     {
       "id": "t1",
-      "iso": "2025-04-21T00:00:00Z",
-      "status": "planned"
+      "iso": "2025-04-21T00:00:00Z"
     },
     {
       "id": "t2",
-      "iso": "2025-04-22T00:00:00Z",
-      "status": "planned"
+      "iso": "2025-04-22T00:00:00Z"
     },
     {
       "id": "t3",
-      "iso": "2025-04-23T00:00:00Z",
-      "status": "planned"
+      "iso": "2025-04-23T00:00:00Z"
     }
   ],
   "depths": [
@@ -62,7 +63,7 @@
     {
       "id": "depth-150",
       "requestedDepthM": 150,
-      "actualDepthM": 142.5
+      "actualDepthM": 155.85069274902344
     },
     {
       "id": "depth-200",
@@ -79,34 +80,61 @@
     "temperature": {
       "sourceVariable": "thetao",
       "unit": "degrees_C",
-      "standardName": "sea_water_potential_temperature"
+      "standardName": "sea_water_potential_temperature",
+      "datasetId": "cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m"
     },
     "salinity": {
       "sourceVariable": "so",
       "unit": "1e-3",
-      "standardName": "sea_water_salinity"
+      "standardName": "sea_water_salinity",
+      "datasetId": "cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m"
     },
     "u": {
       "sourceVariable": "uo",
       "unit": "m s-1",
-      "standardName": "eastward_sea_water_velocity"
+      "standardName": "eastward_sea_water_velocity",
+      "datasetId": "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
     },
     "v": {
       "sourceVariable": "vo",
       "unit": "m s-1",
-      "standardName": "northward_sea_water_velocity"
+      "standardName": "northward_sea_water_velocity",
+      "datasetId": "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
     }
   },
   "featuredArgoId": "5907082-059",
   "argoIds": [
     "5907082-059",
+    "5907083-059",
     "1902669-059",
+    "4903775-059",
+    "2902770-189",
+    "2902772-189",
+    "2902768-190",
     "2902766-196",
-    "7901125-059"
+    "7901125-059",
+    "2903831-008",
+    "2903434-038",
+    "4903776-059",
+    "7901126-059",
+    "2903891-059",
+    "1902373-005"
   ],
   "provenance": {
-    "model": "catalogue-verified; subset pending authentication",
+    "model": "real",
     "argo": "real Argo GDAC delayed-mode adjusted QC 1",
-    "insightText": "pending model comparison"
+    "insightText": "data-derived"
+  },
+  "analysisBounds": {
+    "south": 10,
+    "north": 20,
+    "west": 80,
+    "east": 92
+  },
+  "renderBounds": {
+    "south": 7.0,
+    "north": 22.0,
+    "west": 77.0,
+    "east": 96.0
   }
 }

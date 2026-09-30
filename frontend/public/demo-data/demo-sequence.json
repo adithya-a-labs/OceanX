@@ -5,7 +5,7 @@
     "depthId": "depth-0"
   },
   "requiresModelAssets": true,
-  "ready": false,
+  "ready": true,
   "scenes": [
     {
       "id": "hero"
