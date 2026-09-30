@@ -59,19 +59,21 @@ function buildColorLUT(stops: ColorStop[]): Uint8Array {
 
 const TEMP_LUT = buildColorLUT(TEMP_COLOR_STOPS);
 const SALINITY_LUT = buildColorLUT(SALINITY_COLOR_STOPS);
+const OUTER_FEATHER_FRACTION = 0.15; // Tune between 0.05 and 0.15 of each texture axis.
 
-/** Feather valid pixels inward at null cells, then fade only the outer 8 pixels. */
+/** Smooth only valid-cell alpha, then feather the geographic rectangle's edge. */
 function smoothMaskAlpha(pixels: Uint8ClampedArray, size: number, oceanAlpha: number): void {
-  const weights = [1, 6, 15, 20, 15, 6, 1]; // Separable seven-tap Gaussian mask
-  const horizontal = new Uint8Array(size * size);
+  const weights = [1, 8, 28, 56, 70, 56, 28, 8, 1]; // Nine-tap coastline mask kernel
+  const horizontal = new Uint16Array(size * size);
+  const fadePixels = (size - 1) * OUTER_FEATHER_FRACTION;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       let coverage = 0;
-      for (let offset = -3; offset <= 3; offset++) {
+      for (let offset = -4; offset <= 4; offset++) {
         const sampleX = Math.max(0, Math.min(size - 1, x + offset));
         if (pixels[(y * size + sampleX) * 4 + 3] !== 0) {
-          coverage += weights[offset + 3];
+          coverage += weights[offset + 4];
         }
       }
       horizontal[y * size + x] = coverage;
@@ -84,15 +86,17 @@ function smoothMaskAlpha(pixels: Uint8ClampedArray, size: number, oceanAlpha: nu
       if (pixels[alphaIndex] === 0) continue; // Never reveal land or missing cells.
 
       let coverage = 0;
-      for (let offset = -3; offset <= 3; offset++) {
+      for (let offset = -4; offset <= 4; offset++) {
         const sampleY = Math.max(0, Math.min(size - 1, y + offset));
-        coverage += weights[offset + 3] * horizontal[sampleY * size + x];
+        coverage += weights[offset + 4] * horizontal[sampleY * size + x];
       }
 
       const edgeDistance = Math.min(x, y, size - 1 - x, size - 1 - y);
-      const t = Math.min(1, edgeDistance / 8);
-      const outerFeather = t * t * (3 - 2 * t);
-      pixels[alphaIndex] = Math.round(oceanAlpha * coverage / 4096 * outerFeather);
+      const t = Math.min(1, edgeDistance / fadePixels);
+      const smoothstep = t * t * (3 - 2 * t);
+      // Keep edge-side observations visible while spreading the blend across the full band.
+      const outerFeather = smoothstep ** 0.55;
+      pixels[alphaIndex] = Math.round(oceanAlpha * coverage / 65536 * outerFeather);
     }
   }
 }
