@@ -11,6 +11,8 @@ import argparse
 import json
 from pathlib import Path
 
+import xarray as xr
+
 from demo_data.argo import discover_windows, profiles_and_markers
 from demo_data.comparison import compare
 from demo_data.config import DATASET_ID, DATASET_IDS, DATES, FEATURED_ID, OUTPUT, PRODUCT_ID, RAW, REGION, ROOT
@@ -86,13 +88,11 @@ def export_legacy_slice():
 
 
 def export_argo(meta):
-    profiles, markers = profiles_and_markers()
+    profiles, markers, report = profiles_and_markers()
     for profile in profiles:
         write(OUTPUT / "argo" / "profiles" / f"{profile['id']}.json", profile)
     write(OUTPUT / "argo" / "markers.json", markers)
-    write(OUTPUT / "manifest.json", manifest(meta, profiles))
-    write(OUTPUT / "demo-sequence.json", sequence(False))
-    return profiles
+    return profiles, report
 
 
 def main():
@@ -111,12 +111,26 @@ def main():
         return
     meta = metadata()
     if args.command == "argo":
-        profiles = export_argo(meta)
-        print(f"Exported {len(profiles)} real Argo GDAC profiles. Model assets remain pending.")
+        profiles, report = export_argo(meta)
+        current = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))
+        current["argoIds"] = [profile["id"] for profile in profiles]
+        current["provenance"]["argo"] = "real Argo GDAC delayed-mode adjusted QC 1"
+        if current["assetsReady"]:
+            source = RAW / "temperature-2025-04-20-to-23.nc"
+            if not source.exists():
+                raise FileNotFoundError(f"Cached model NetCDF required for Argo comparisons: {source}")
+            with xr.open_dataset(source) as dataset:
+                normalized = dataset.rename({key: value for key, value in (("lat", "latitude"), ("lon", "longitude"))
+                                             if key in dataset.dims})
+                for profile in profiles:
+                    write(OUTPUT / "comparisons" / f"{profile['id']}.json",
+                          compare(profile, normalized, meta["variables"]["temperature"]["sourceVariable"]))
+        write(OUTPUT / "manifest.json", current)
+        print(f"Exported {len(profiles)} real Argo GDAC profiles: {report}")
         print(validate(OUTPUT))
         return
     source = download_subset(meta)
-    profiles = export_argo(meta)
+    profiles, report = export_argo(meta)
     dataset, times = export_model(source, meta, OUTPUT)
     export_legacy_slice()
     for profile in profiles:
@@ -124,6 +138,7 @@ def main():
         write(OUTPUT / "comparisons" / f"{profile['id']}.json", result)
     write(OUTPUT / "manifest.json", manifest(meta, profiles, times))
     write(OUTPUT / "demo-sequence.json", sequence(True))
+    print(f"Argo selection: {report}")
     print(validate(OUTPUT))
 
 

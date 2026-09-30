@@ -1,6 +1,6 @@
 """Read official GDAC core profiles with delayed-mode QC 1 values only."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import gzip
 from collections import defaultdict
 from pathlib import Path
@@ -10,7 +10,7 @@ import numpy as np
 import requests
 import xarray as xr
 
-from .config import GDAC_BASE, GDAC_INDEX, PROFILE_PATHS, RAW, REGION
+from .config import DATES, GDAC_BASE, GDAC_INDEX, PROFILE_PATHS, RAW, REGION
 
 
 def discover_windows():
@@ -47,6 +47,32 @@ def discover_windows():
                        "platformCount": len({platform for platform, _ in files}),
                        "profileCount": len(files), "profiles": files})
     return sorted(ranked, key=lambda item: (-item["platformCount"], -item["profileCount"], item["start"]))
+
+
+def candidates_in_window(padding_days):
+    """Official delayed-mode core profiles within the demo box and padded dates."""
+    index = RAW / "ar_index_global_prof.txt.gz"
+    if not index.exists():
+        discover_windows()  # Download/cache the official GDAC index.
+    start = date.fromisoformat(DATES[0]) - timedelta(days=padding_days)
+    end = date.fromisoformat(DATES[-1]) + timedelta(days=padding_days)
+    paths = set()
+    with gzip.open(index, "rt", encoding="utf-8", errors="replace") as lines:
+        for line in lines:
+            if line.startswith("#") or line.startswith("file,"):
+                continue
+            fields = line.strip().split(",")
+            if len(fields) < 4 or "/D" not in fields[0]:
+                continue
+            try:
+                day = datetime.strptime(fields[1][:8], "%Y%m%d").date()
+                latitude, longitude = float(fields[2]), float(fields[3])
+            except ValueError:
+                continue
+            if start <= day <= end and REGION["south"] <= latitude <= REGION["north"] \
+                    and REGION["west"] <= longitude <= REGION["east"]:
+                paths.add(fields[0].removeprefix("dac/"))
+    return sorted(paths)
 
 
 def download_profiles(paths=PROFILE_PATHS):
@@ -115,7 +141,45 @@ def read_profile(remote, path):
 
 
 def profiles_and_markers():
-    profiles = [read_profile(remote, local) for remote, local in download_profiles()]
+    selected = []
+    report = None
+    pinned = set(PROFILE_PATHS)
+    for padding in (0, 3, 7, 14):
+        candidates = candidates_in_window(padding)
+        accepted = []
+        rejected = []
+        for remote, local in download_profiles(candidates):
+            try:
+                profile = read_profile(remote, local)
+                observed = date.fromisoformat(profile["time"][:10])
+                if not (date.fromisoformat(DATES[0]) - timedelta(days=padding) <= observed <=
+                        date.fromisoformat(DATES[-1]) + timedelta(days=padding)):
+                    raise ValueError("NetCDF timestamp outside selected window")
+                if not (REGION["south"] <= profile["latitude"] <= REGION["north"] and
+                        REGION["west"] <= profile["longitude"] <= REGION["east"]):
+                    raise ValueError("NetCDF position outside region")
+                accepted.append((remote, profile))
+            except (KeyError, ValueError, IndexError) as error:
+                rejected.append((remote, str(error)))
+        by_platform = defaultdict(list)
+        for remote, profile in accepted:
+            by_platform[profile["platformId"]].append((remote, profile))
+        selected = [max(items, key=lambda item: (
+            item[0] in pinned,
+            any(value is not None for value in item[1]["salinity"]),
+            item[1]["depthM"][-1],
+            item[1]["time"],
+        ))[1] for items in by_platform.values()]
+        selected.sort(key=lambda profile: (profile["time"], profile["id"]))
+        report = {"paddingDays": padding, "candidates": len(candidates),
+                  "acceptedAfterQc": len(accepted), "uniqueFloats": len(selected),
+                  "rejected": rejected}
+        if len(selected) >= 10:
+            break
+    if not pinned.issubset({profile["source"]["profileFile"].removeprefix(GDAC_BASE)
+                            for profile in selected}):
+        raise ValueError("An existing pinned Argo profile was not retained")
+    profiles = selected
     markers = [
         {
             "id": p["id"], "platformId": p["platformId"], "cycle": p["cycle"],
@@ -126,4 +190,4 @@ def profiles_and_markers():
         }
         for p in profiles
     ]
-    return profiles, markers
+    return profiles, markers, report
