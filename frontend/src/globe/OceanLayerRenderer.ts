@@ -1,8 +1,7 @@
 /**
  * OceanX Cesium Ocean Layer Renderer
  * Renders scientific scalar fields (temperature, salinity) onto the Cesium globe.
- * Creates a smooth, continuous, transparent oceanographic heatmap overlay
- * that naturally fades into the surrounding ocean with zero rectangular borders.
+ * Creates a smooth, continuous oceanographic heatmap over the source grid.
  */
 
 import * as Cesium from 'cesium';
@@ -81,7 +80,7 @@ export class OceanLayerRenderer {
 
   /**
    * Update the active ocean scalar layer (temperature or salinity)
-   * Renders a continuous, translucent heatmap with smooth elliptical boundary falloff.
+   * Renders a continuous, translucent heatmap across the source grid bounds.
    */
   public async renderSlice(slice: OceanSlice): Promise<void> {
     if (this.isDisposed) return;
@@ -101,13 +100,9 @@ export class OceanLayerRenderer {
     const imgData = this.ctx.createImageData(this.canvasSize, this.canvasSize);
     const pixels = imgData.data;
 
-    const cx = (this.canvasSize - 1) / 2;
-    const cy = (this.canvasSize - 1) / 2;
-    const peakAlpha = 0.52; // Semi-transparent: satellite ocean imagery remains clearly visible
+    const oceanAlpha = Math.round(0.52 * 255); // Satellite imagery remains visible
 
     for (let py = 0; py < this.canvasSize; py++) {
-      const ny = (py - cy) / cy; // -1 at top to +1 at bottom
-
       // Row 0 in canvas is North (top)
       const gy = (py / (this.canvasSize - 1)) * (rows - 1);
       const r0 = Math.floor(gy);
@@ -117,28 +112,7 @@ export class OceanLayerRenderer {
       const sfy = fy * fy * (3 - 2 * fy);
 
       for (let px = 0; px < this.canvasSize; px++) {
-        const nx = (px - cx) / cx; // -1 at left to +1 at right
-
-        // Normalized elliptical distance from center of data field
-        const dist = Math.hypot(nx, ny);
-
         const pIdx = (py * this.canvasSize + px) * 4;
-
-        // Beyond the soft boundary, completely transparent
-        if (dist >= 0.95) {
-          pixels[pIdx + 0] = 0;
-          pixels[pIdx + 1] = 0;
-          pixels[pIdx + 2] = 0;
-          pixels[pIdx + 3] = 0;
-          continue;
-        }
-
-        // Smooth cosine falloff from dist = 0.30 to dist = 0.95
-        let edgeFactor = 1.0;
-        if (dist > 0.30) {
-          const t = (dist - 0.30) / (0.95 - 0.30);
-          edgeFactor = 0.5 * (1 + Math.cos(t * Math.PI));
-        }
 
         // Col 0 in canvas is West (left)
         const gx = (px / (this.canvasSize - 1)) * (cols - 1);
@@ -173,13 +147,10 @@ export class OceanLayerRenderer {
         const norm = Math.max(0, Math.min(1, (val - minVal) / valRange));
         const lutIdx = Math.round(norm * 255);
 
-        // Translucent alpha that smoothly fades to 0 at perimeter
-        const alpha = Math.round(peakAlpha * edgeFactor * 255);
-
         pixels[pIdx + 0] = lut[lutIdx * 3 + 0];
         pixels[pIdx + 1] = lut[lutIdx * 3 + 1];
         pixels[pIdx + 2] = lut[lutIdx * 3 + 2];
-        pixels[pIdx + 3] = alpha;
+        pixels[pIdx + 3] = oceanAlpha;
       }
     }
 
@@ -203,7 +174,7 @@ export class OceanLayerRenderer {
 
       const oldLayer = this.currentLayer;
       const newLayer = this.viewer.imageryLayers.addImageryProvider(provider);
-      newLayer.alpha = 1.0; // Opacity controlled per-pixel by smooth radial falloff
+      newLayer.alpha = 1.0; // Opacity controlled per pixel; missing cells remain transparent
 
       this.currentLayer = newLayer;
 
