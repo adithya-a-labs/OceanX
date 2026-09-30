@@ -8,7 +8,8 @@ async function ids(depth: number, time: string) {
   const selectedDepth = manifest.depths.reduce((best, item) =>
     Math.abs(item.requestedDepthM - depth) < Math.abs(best.requestedDepthM - depth) ? item : best,
   manifest.depths[0]);
-  const selectedTime = manifest.times.find(item => item.id === time || item.iso === time);
+  const selectedTime = manifest.times.find(item => item.id === time || item.iso === time)
+    ?? (time === '' ? manifest.times[0] : undefined);
   if (!selectedDepth || !selectedTime) throw new Error('Unknown demo frame');
   return { depthId: selectedDepth.id, timeId: selectedTime.id };
 }

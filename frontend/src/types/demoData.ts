@@ -5,6 +5,8 @@ export interface DemoManifest {
   version: number;
   assetsReady: boolean;
   region: { name: string; south: number; north: number; west: number; east: number };
+  analysisBounds: { south: number; north: number; west: number; east: number };
+  renderBounds: { south: number; north: number; west: number; east: number };
   model: { provider: string; productId: string; datasetId: string; datasetVersion: string; doi: string };
   plannedDates: string[];
   times: { id: string; iso: string; status?: 'planned' }[];

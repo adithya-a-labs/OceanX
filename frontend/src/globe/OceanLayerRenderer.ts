@@ -59,9 +59,8 @@ function buildColorLUT(stops: ColorStop[]): Uint8Array {
 
 const TEMP_LUT = buildColorLUT(TEMP_COLOR_STOPS);
 const SALINITY_LUT = buildColorLUT(SALINITY_COLOR_STOPS);
-// The original radial renderer faded over 0.30–0.95 of its normalized radius.
-// Use that broad cosine profile along each edge of the full geographic rectangle.
-const OUTER_FEATHER_FRACTION = 0.35;
+// The real render grid extends beyond the analysis view; fade only its remote edge.
+const OUTER_FEATHER_FRACTION = 0.08;
 
 /** Smooth only valid-cell alpha, then feather the geographic rectangle's edge. */
 function smoothMaskAlpha(pixels: Uint8ClampedArray, size: number, oceanAlpha: number): void {
@@ -95,9 +94,7 @@ function smoothMaskAlpha(pixels: Uint8ClampedArray, size: number, oceanAlpha: nu
 
       const edgeDistance = Math.min(x, y, size - 1 - x, size - 1 - y);
       const t = Math.min(1, edgeDistance / fadePixels);
-      // The old cosine falloff is mapped to rectangular edge distance instead of
-      // elliptical radius. Its gentle exponent keeps valid near-edge Argo sites visible.
-      const outerFeather = (0.5 - 0.5 * Math.cos(Math.PI * t)) ** 0.35;
+      const outerFeather = t * t * (3 - 2 * t);
       pixels[alphaIndex] = Math.round(oceanAlpha * coverage / 65536 * outerFeather);
     }
   }

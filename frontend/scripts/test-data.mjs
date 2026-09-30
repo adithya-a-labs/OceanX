@@ -18,11 +18,17 @@ globalThis.fetch = async url => {
 
 try {
   const data = await server.ssrLoadModule('/src/data/demoData.ts');
+  const { demoDataHelpers } = await server.ssrLoadModule('/src/data/legacyAdapter.ts');
   const { useOceanStore } = await server.ssrLoadModule('/src/store/useOceanStore.ts');
   const manifest = await data.loadDemoManifest();
   assert.equal(manifest.assetsReady, true);
   assert.equal(manifest.times.length, 4);
   assert.equal(manifest.depths.length, 6);
+  assert.deepEqual(manifest.analysisBounds, { south: 10, north: 20, west: 80, east: 92 });
+  assert(manifest.renderBounds.south < manifest.analysisBounds.south);
+  assert(manifest.renderBounds.north > manifest.analysisBounds.north);
+  assert(manifest.renderBounds.west < manifest.analysisBounds.west);
+  assert(manifest.renderBounds.east > manifest.analysisBounds.east);
   const store = useOceanStore.getState();
   store.initializeFromManifest(manifest);
   assert.equal(useOceanStore.getState().timeId, manifest.times[0].id);
@@ -39,6 +45,10 @@ try {
   assert.equal(markers.length, manifest.argoIds.length);
   assert(markers.length >= 10);
   assert.equal(new Set(markers.map(marker => marker.id)).size, markers.length);
+  assert(markers.every(marker => marker.latitude > manifest.analysisBounds.south &&
+    marker.latitude < manifest.analysisBounds.north &&
+    marker.longitude > manifest.analysisBounds.west &&
+    marker.longitude < manifest.analysisBounds.east));
   const allProfiles = await Promise.all(markers.map(marker => data.getArgoProfile(marker.id)));
   for (const [index, item] of allProfiles.entries()) {
     assert.equal(item.id, markers[index].id);
@@ -54,7 +64,13 @@ try {
   assert.equal(temperature.meta.actualDepthM, manifest.depths[2].actualDepthM);
   assert.equal(temperature.values.length, temperature.latitudes.length);
   assert.equal(temperature.values[0].length, temperature.longitudes.length);
-  assert(temperature.meta.rows * temperature.meta.columns > 10000);
+  assert(temperature.meta.rows > 121 && temperature.meta.columns > 145);
+  assert.equal(temperature.latitudes[0], manifest.renderBounds.south);
+  assert.equal(temperature.latitudes.at(-1), manifest.renderBounds.north);
+  assert.equal(temperature.longitudes[0], manifest.renderBounds.west);
+  assert.equal(temperature.longitudes.at(-1), manifest.renderBounds.east);
+  const initialSlice = await demoDataHelpers.getOceanSlice('temperature', 0, '');
+  assert.equal(initialSlice.time, manifest.times[0].iso);
   useOceanStore.getState().setVariable('salinity');
   assert.equal(useOceanStore.getState().variable, 'salinity');
   const salinity = await data.getOceanLayer('salinity', 'depth-200', 't3');
@@ -63,6 +79,8 @@ try {
   const currents = await data.getCurrents('t2');
   assert.equal(currents.meta.time, manifest.times[2].iso);
   assert.equal(currents.u.length, currents.latitudes.length);
+  assert.equal(currents.latitudes[0], manifest.renderBounds.south);
+  assert.equal(currents.longitudes.at(-1), manifest.renderBounds.east);
   const comparison = await data.getComparison(profile.id);
   assert.equal(comparison.observationId, profile.id);
   const comparisons = await Promise.all(markers.map(marker => data.getComparison(marker.id)));
