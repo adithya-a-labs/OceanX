@@ -41,14 +41,22 @@ def validate(output):
         return {"status": "argo-only", "profiles": len(markers)}
     for time in manifest["times"]:
         for depth in manifest["depths"]:
-            for variable in ("temperature", "salinity"):
+            for variable in ("temperature", "salinity", "u", "v"):
                 layer = read(output / "ocean" / variable / time["id"] / f"{depth['id']}.json")
                 meta = layer["meta"]
                 rows, columns = len(layer["latitudes"]), len(layer["longitudes"])
                 grid_shape(layer["values"], rows, columns)
                 assert rows == meta["rows"] and columns == meta["columns"]
+                assert rows * columns > 10000
+                assert all(a < b for a, b in zip(layer["latitudes"], layer["latitudes"][1:]))
+                assert all(a < b for a, b in zip(layer["longitudes"], layer["longitudes"][1:]))
+                assert layer["latitudes"][0] >= manifest["region"]["south"]
+                assert layer["latitudes"][-1] <= manifest["region"]["north"]
+                assert layer["longitudes"][0] >= manifest["region"]["west"]
+                assert layer["longitudes"][-1] <= manifest["region"]["east"]
                 assert meta["actualDepthM"] == depth["actualDepthM"]
                 assert meta["time"] == time["iso"] and meta["unit"]
+                assert meta["datasetId"] == manifest["variables"][variable]["datasetId"]
                 assert math.isfinite(meta["min"]) and meta["min"] <= meta["max"]
         currents = read(output / "currents" / f"{time['id']}.json")
         rows, columns = len(currents["latitudes"]), len(currents["longitudes"])
@@ -68,4 +76,4 @@ def validate(output):
         assert all(abs((m - o) - d) < 1e-8 for o, m, d in zip(observed, model, difference))
         assert abs(rmse(observed, model) - comparison["rmse"]) < 1e-10
     return {"status": "ready", "profiles": len(markers),
-            "layers": len(manifest["times"]) * len(manifest["depths"]) * 2}
+            "layers": len(manifest["times"]) * len(manifest["depths"]) * 4}

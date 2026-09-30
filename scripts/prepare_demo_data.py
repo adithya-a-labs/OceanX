@@ -13,7 +13,7 @@ from pathlib import Path
 
 from demo_data.argo import discover_windows, profiles_and_markers
 from demo_data.comparison import compare
-from demo_data.config import DATASET_ID, DATES, FEATURED_ID, OUTPUT, PRODUCT_ID, RAW, REGION
+from demo_data.config import DATASET_ID, DATASET_IDS, DATES, FEATURED_ID, OUTPUT, PRODUCT_ID, RAW, REGION, ROOT
 from demo_data.model import download_subset, export_model, inspect_catalogue
 from demo_data.validate import validate
 
@@ -25,7 +25,11 @@ def write(path, value):
 
 def metadata():
     cached = RAW / "verified-metadata.json"
-    return json.loads(cached.read_text(encoding="utf-8")) if cached.exists() else inspect_catalogue()
+    if cached.exists():
+        value = json.loads(cached.read_text(encoding="utf-8"))
+        if value.get("datasetIds") == DATASET_IDS:
+            return value
+    return inspect_catalogue()
 
 
 def manifest(meta, profiles, times=None):
@@ -34,7 +38,7 @@ def manifest(meta, profiles, times=None):
         "region": REGION,
         "model": {"provider": "Copernicus Marine", "productId": PRODUCT_ID,
                   "datasetId": DATASET_ID, "datasetVersion": meta["datasetVersion"],
-                  "doi": "10.48670/moi-00021"},
+                  "datasetIds": DATASET_IDS, "doi": "10.48670/moi-00016"},
         "plannedDates": list(DATES),
         "times": times if times is not None else [
             {"id": f"t{i}", "iso": f"{day}T00:00:00Z", "status": "planned"}
@@ -66,6 +70,21 @@ def sequence(ready):
     }
 
 
+def export_legacy_slice():
+    """Keep the old standalone grid example real and dense as well."""
+    layer = json.loads((OUTPUT / "ocean" / "temperature" / "t0" / "depth-100.json").read_text(encoding="utf-8"))
+    write(ROOT / "data" / "mock" / "ocean-slice.json", {
+        "variable": "temperature", "unit": layer["meta"]["unit"],
+        "time": layer["meta"]["time"], "depth": layer["meta"]["actualDepthM"],
+        "requestedDepthM": layer["meta"]["requestedDepthM"],
+        "source": layer["meta"]["source"], "datasetId": layer["meta"]["datasetId"],
+        "bounds": {"north": layer["latitudes"][-1], "south": layer["latitudes"][0],
+                   "west": layer["longitudes"][0], "east": layer["longitudes"][-1]},
+        "latitudes": layer["latitudes"], "longitudes": layer["longitudes"],
+        "values": layer["values"],
+    })
+
+
 def export_argo(meta):
     profiles, markers = profiles_and_markers()
     for profile in profiles:
@@ -91,13 +110,15 @@ def main():
         print(validate(OUTPUT))
         return
     meta = metadata()
-    profiles = export_argo(meta)
     if args.command == "argo":
+        profiles = export_argo(meta)
         print(f"Exported {len(profiles)} real Argo GDAC profiles. Model assets remain pending.")
         print(validate(OUTPUT))
         return
     source = download_subset(meta)
+    profiles = export_argo(meta)
     dataset, times = export_model(source, meta, OUTPUT)
+    export_legacy_slice()
     for profile in profiles:
         result = compare(profile, dataset, meta["variables"]["temperature"]["sourceVariable"])
         write(OUTPUT / "comparisons" / f"{profile['id']}.json", result)

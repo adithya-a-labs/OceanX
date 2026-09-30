@@ -2,12 +2,12 @@
 
 ## Model
 
-- **Provider/product:** [Copernicus Marine Global Ocean Physics Reanalysis](https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/services), product `GLOBAL_MULTIYEAR_PHY_001_030`, daily dataset `cmems_mod_glo_phy_my_0.083deg_P1D-m`, version `202311`, DOI `10.48670/moi-00021`.
-- **Verified from the Copernicus Marine Toolbox catalogue on 29 September 2026:** `thetao` = sea water potential temperature (`degrees_C`); `so` = sea water salinity (`1e-3`); `uo` = eastward sea water velocity (`m s-1`); `vo` = northward sea water velocity (`m s-1`). Catalogue coordinates are `time`, `depth`, `latitude`, `longitude`; latitude and longitude are degrees north/east and depth is metres. The [Toolbox metadata guide](https://help.marine.copernicus.eu/en/articles/8286798-copernicus-marine-toolbox-api-explore-the-catalogue-and-metadata) describes this catalogue inspection.
+- **Provider/product:** [Copernicus Marine Global Ocean Physics Analysis and Forecast](https://data.marine.copernicus.eu/product/GLOBAL_ANALYSISFORECAST_PHY_001_024/services), product `GLOBAL_ANALYSISFORECAST_PHY_001_024`, version `202406`, DOI `10.48670/moi-00016`.
+- **Verified from the Copernicus Marine Toolbox catalogue on 30 September 2026:** `thetao` (`degrees_C`) from `cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m`; `so` (`1e-3`) from `cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m`; `uo` and `vo` (`m s-1`) from `cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m`. Coordinates are `time`, `depth`, `latitude`, `longitude`. The [Toolbox metadata guide](https://help.marine.copernicus.eu/en/articles/8286798-copernicus-marine-toolbox-api-explore-the-catalogue-and-metadata) describes this catalogue inspection.
 - **Bounds:** 10–20°N, 80–92°E. No adjustment to the requested box.
-- **Planned recording dates:** 2025-04-20 through 2025-04-23, one daily frame per date. Actual ISO timestamps are **pending subset download**; they must not be described as hourly or as observed output yet.
-- **Catalogue-verified nearest model depths:** target surface → 0.494025 m; 50 → 47.373692 m; 100 → 92.326073 m; 200 → 186.125595 m; 500 → 541.088928 m. The generator checks these against the downloaded coordinate values before writing layers.
-- **Current model status:** no model scientific values have been exported. The Copernicus Toolbox credential check reported no credentials. `manifest.json` keeps `assetsReady: false`, and model requests reject. The [Toolbox authentication guide](https://help.marine.copernicus.eu/en/articles/8185007-copernicus-marine-toolbox-credentials-configuration) and [environment variable guide](https://help.marine.copernicus.eu/en/articles/8630590-copernicus-marine-toolbox-faq) document login options.
+- **Downloaded timestamps:** 2025-04-20, 21, 22, and 23 at 00:00 UTC, one daily frame per date.
+- **Nearest model depths:** target 0 → 0.494025 m; 50 → 47.373692 m; 100 → 92.326073 m; 150 → 155.850693 m; 200 → 186.125595 m; 500 → 541.088928 m. The generator checks these against downloaded coordinates.
+- **Grid and status:** 121 × 145 native cells per frame at 1/12° spacing. Land and missing cells are JSON `null`. The manifest has `assetsReady: true`.
 
 ## Observations
 
@@ -24,6 +24,6 @@ The exporter uses only **delayed-mode (`D`) adjusted** `PRES`, `TEMP`, and `PSAL
 
 ## Comparison and prototype wording
 
-When model access is available, each Argo profile is matched to the nearest daily model time and horizontal grid cell. A full model vertical profile is linearly interpolated onto valid observed depths within the overlapping depth range only. `difference = model − observed`; RMSE is the square root of the mean paired squared differences. The insight text reports the largest paired absolute temperature difference and its depth. It makes no causal claim. No comparison, RMSE, or insight has been published in the current pending-model package.
+Each Argo profile is matched to the nearest daily model time and horizontal grid cell. A model vertical profile is linearly interpolated onto valid observed depths within the overlapping depth range only. `difference = model − observed`; RMSE is the square root of the mean paired squared differences. The insight text reports the largest paired absolute temperature difference and its depth. It makes no causal claim.
 
 The old root-level demo-data assets (`ocean-slices/`, `comparison/`, `argo-profiles.json`, `currents.json`) are legacy mock placeholders. Their values are not cited as scientific data and the new runtime service does not use them. No credentials, raw NetCDF, or GDAC index files are committed.
