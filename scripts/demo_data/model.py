@@ -8,7 +8,7 @@ import copernicusmarine
 import numpy as np
 import xarray as xr
 
-from .config import DATASET_IDS, DATES, RAW, REGION, REQUESTED_DEPTHS, VARIABLE_STANDARDS
+from .config import DATASET_IDS, DATES, RAW, REGION, RENDER_REGION, REQUESTED_DEPTHS, VARIABLE_STANDARDS
 
 
 def inspect_catalogue():
@@ -76,14 +76,14 @@ def download_subset(metadata):
         "currents": [metadata["variables"][k]["sourceVariable"] for k in ("u", "v")],
     }
     for key, dataset_id in DATASET_IDS.items():
-        source = RAW / f"{key}-2025-04-20-to-23.nc"
+        source = RAW / f"{key}-render-{DATES[0]}-to-{DATES[-1]}.nc"
         if not source.exists():
             copernicusmarine.subset(
                 dataset_id=dataset_id,
                 dataset_version=metadata["datasetVersions"][key],
                 variables=variables[key],
-                minimum_longitude=REGION["west"], maximum_longitude=REGION["east"],
-                minimum_latitude=REGION["south"], maximum_latitude=REGION["north"],
+                minimum_longitude=RENDER_REGION["west"], maximum_longitude=RENDER_REGION["east"],
+                minimum_latitude=RENDER_REGION["south"], maximum_latitude=RENDER_REGION["north"],
                 minimum_depth=0, maximum_depth=550,
                 start_datetime=f"{DATES[0]}T00:00:00",
                 end_datetime=f"{DATES[-1]}T23:59:59",
@@ -92,6 +92,14 @@ def download_subset(metadata):
             )
         if not source.exists():
             raise RuntimeError(f"Copernicus subset returned without {source}")
+        with xr.open_dataset(source) as cached:
+            latitude = cached["latitude"] if "latitude" in cached else cached["lat"]
+            longitude = cached["longitude"] if "longitude" in cached else cached["lon"]
+            if not (RENDER_REGION["south"] - 0.1 <= float(latitude.min()) <= RENDER_REGION["south"] + 0.1
+                    and RENDER_REGION["north"] - 0.1 <= float(latitude.max()) <= RENDER_REGION["north"] + 0.1
+                    and RENDER_REGION["west"] - 0.1 <= float(longitude.min()) <= RENDER_REGION["west"] + 0.1
+                    and RENDER_REGION["east"] - 0.1 <= float(longitude.max()) <= RENDER_REGION["east"] + 0.1):
+                raise ValueError(f"Cached subset does not cover the render region: {source}")
         sources[key] = source
     return sources
 
@@ -130,9 +138,9 @@ def export_model(sources, metadata, output):
                 raise ValueError(f"Downloaded unit for {name} differs from the catalogue")
             if set(ds[name].dims) != {"time", "depth", "latitude", "longitude"}:
                 raise ValueError(f"Unexpected dimensions for {name}")
-        if not (REGION["south"] <= float(ds.latitude.min()) <= float(ds.latitude.max()) <= REGION["north"]
-                and REGION["west"] <= float(ds.longitude.min()) <= float(ds.longitude.max()) <= REGION["east"]):
-            raise ValueError("Downloaded coordinates fall outside the requested region")
+        if not (float(ds.latitude.min()) < REGION["south"] < REGION["north"] < float(ds.latitude.max())
+                and float(ds.longitude.min()) < REGION["west"] < REGION["east"] < float(ds.longitude.max())):
+            raise ValueError("Downloaded grid does not pad every side of the analysis region")
         if metadata["variables"]["u"]["unit"] != metadata["variables"]["v"]["unit"]:
             raise ValueError("U and V units differ")
         expected = [np.datetime64(day) for day in DATES]

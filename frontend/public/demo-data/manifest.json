@@ -124,5 +124,17 @@
     "model": "real",
     "argo": "real Argo GDAC delayed-mode adjusted QC 1",
     "insightText": "data-derived"
+  },
+  "analysisBounds": {
+    "south": 10,
+    "north": 20,
+    "west": 80,
+    "east": 92
+  },
+  "renderBounds": {
+    "south": 7.0,
+    "north": 22.0,
+    "west": 77.0,
+    "east": 96.0
   }
 }

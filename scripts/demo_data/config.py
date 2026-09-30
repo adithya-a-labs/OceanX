@@ -13,6 +13,7 @@ DATASET_IDS = {
 }
 DATASET_ID = DATASET_IDS["temperature"]  # Existing single-ID manifest field.
 REGION = {"name": "Bay of Bengal", "south": 10, "north": 20, "west": 80, "east": 92}
+RENDER_REGION = {"south": 7, "north": 22, "west": 77, "east": 96}
 DATES = ("2025-04-20", "2025-04-21", "2025-04-22", "2025-04-23")
 REQUESTED_DEPTHS = (0, 50, 100, 150, 200, 500)
 VARIABLE_STANDARDS = {

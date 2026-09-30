@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 
 from .comparison import rmse
+from .config import RENDER_REGION
 
 
 def read(path):
@@ -23,6 +24,12 @@ def grid_shape(values, rows, columns):
 def validate(output):
     output = Path(output)
     manifest = read(output / "manifest.json")
+    analysis = manifest["analysisBounds"]
+    render = manifest["renderBounds"]
+    assert all(analysis[key] == manifest["region"][key] for key in ("south", "north", "west", "east"))
+    assert render["south"] < analysis["south"] < analysis["north"] < render["north"]
+    assert render["west"] < analysis["west"] < analysis["east"] < render["east"]
+    assert all(abs(render[key] - RENDER_REGION[key]) <= 0.1 for key in RENDER_REGION)
     markers = read(output / "argo" / "markers.json")
     ids = [m["id"] for m in markers]
     assert len(ids) == len(set(ids)) and len(ids) >= 3
@@ -50,10 +57,10 @@ def validate(output):
                 assert rows * columns > 10000
                 assert all(a < b for a, b in zip(layer["latitudes"], layer["latitudes"][1:]))
                 assert all(a < b for a, b in zip(layer["longitudes"], layer["longitudes"][1:]))
-                assert layer["latitudes"][0] >= manifest["region"]["south"]
-                assert layer["latitudes"][-1] <= manifest["region"]["north"]
-                assert layer["longitudes"][0] >= manifest["region"]["west"]
-                assert layer["longitudes"][-1] <= manifest["region"]["east"]
+                assert math.isclose(layer["latitudes"][0], render["south"], abs_tol=1e-5)
+                assert math.isclose(layer["latitudes"][-1], render["north"], abs_tol=1e-5)
+                assert math.isclose(layer["longitudes"][0], render["west"], abs_tol=1e-5)
+                assert math.isclose(layer["longitudes"][-1], render["east"], abs_tol=1e-5)
                 assert meta["actualDepthM"] == depth["actualDepthM"]
                 assert meta["time"] == time["iso"] and meta["unit"]
                 assert meta["datasetId"] == manifest["variables"][variable]["datasetId"]
@@ -62,6 +69,10 @@ def validate(output):
         rows, columns = len(currents["latitudes"]), len(currents["longitudes"])
         for key in ("u", "v", "speed"):
             grid_shape(currents[key], rows, columns)
+        assert math.isclose(currents["latitudes"][0], render["south"], abs_tol=1e-5)
+        assert math.isclose(currents["latitudes"][-1], render["north"], abs_tol=1e-5)
+        assert math.isclose(currents["longitudes"][0], render["west"], abs_tol=1e-5)
+        assert math.isclose(currents["longitudes"][-1], render["east"], abs_tol=1e-5)
         assert currents["meta"]["time"] == time["iso"] and currents["meta"]["unit"]
         for urow, vrow, srow in zip(currents["u"], currents["v"], currents["speed"]):
             for u, v, speed in zip(urow, vrow, srow):
