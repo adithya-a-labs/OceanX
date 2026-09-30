@@ -357,8 +357,26 @@ export class CesiumGlobe implements GlobeInstance {
   public async captureFrame(): Promise<Blob> {
     return new Promise<Blob>((resolve, reject) => {
       this.viewer.render();
-      const canvas = this.viewer.canvas;
-      canvas.toBlob((blob) => {
+      const baseCanvas = this.viewer.canvas;
+      const overlayCanvas = this.currentsSystem.getCanvas();
+
+      if (overlayCanvas && this.isCurrentsVisible) {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = baseCanvas.width;
+        offscreen.height = baseCanvas.height;
+        const ctx = offscreen.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(baseCanvas, 0, 0);
+          ctx.drawImage(overlayCanvas, 0, 0, baseCanvas.width, baseCanvas.height);
+          offscreen.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Failed to capture frame'));
+          }, 'image/png');
+          return;
+        }
+      }
+
+      baseCanvas.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error('Failed to capture frame'));
       }, 'image/png');
