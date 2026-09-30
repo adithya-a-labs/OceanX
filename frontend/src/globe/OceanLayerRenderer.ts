@@ -60,6 +60,43 @@ function buildColorLUT(stops: ColorStop[]): Uint8Array {
 const TEMP_LUT = buildColorLUT(TEMP_COLOR_STOPS);
 const SALINITY_LUT = buildColorLUT(SALINITY_COLOR_STOPS);
 
+/** Feather valid pixels inward at null cells, then fade only the outer 8 pixels. */
+function smoothMaskAlpha(pixels: Uint8ClampedArray, size: number, oceanAlpha: number): void {
+  const weights = [1, 6, 15, 20, 15, 6, 1]; // Separable seven-tap Gaussian mask
+  const horizontal = new Uint8Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let coverage = 0;
+      for (let offset = -3; offset <= 3; offset++) {
+        const sampleX = Math.max(0, Math.min(size - 1, x + offset));
+        if (pixels[(y * size + sampleX) * 4 + 3] !== 0) {
+          coverage += weights[offset + 3];
+        }
+      }
+      horizontal[y * size + x] = coverage;
+    }
+  }
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const alphaIndex = (y * size + x) * 4 + 3;
+      if (pixels[alphaIndex] === 0) continue; // Never reveal land or missing cells.
+
+      let coverage = 0;
+      for (let offset = -3; offset <= 3; offset++) {
+        const sampleY = Math.max(0, Math.min(size - 1, y + offset));
+        coverage += weights[offset + 3] * horizontal[sampleY * size + x];
+      }
+
+      const edgeDistance = Math.min(x, y, size - 1 - x, size - 1 - y);
+      const t = Math.min(1, edgeDistance / 8);
+      const outerFeather = t * t * (3 - 2 * t);
+      pixels[alphaIndex] = Math.round(oceanAlpha * coverage / 4096 * outerFeather);
+    }
+  }
+}
+
 export class OceanLayerRenderer {
   private viewer: Cesium.Viewer;
   private currentLayer: Cesium.ImageryLayer | null = null;
@@ -154,6 +191,7 @@ export class OceanLayerRenderer {
       }
     }
 
+    smoothMaskAlpha(pixels, this.canvasSize, oceanAlpha);
     this.ctx.putImageData(imgData, 0, 0);
 
     const rectangle = Cesium.Rectangle.fromDegrees(
