@@ -1,517 +1,179 @@
-# OceanX 🌊
+# OceanX
 
-OceanX is an **interactive 3D ocean exploration prototype** for SIH 2026 — think **Google Earth for the ocean**.
+OceanX is an interactive 3D ocean explorer for the Bay of Bengal: a Google Earth style view of ocean conditions across location, depth, and time.
 
-Instead of stopping at the sea surface, OceanX lets a user explore the ocean across **location, depth and time**, visualize **temperature, salinity and currents**, and compare ocean-model values with **real-world Argo observations**.
+**What it does:** Explore Copernicus temperature and salinity on a Cesium globe, animate surface currents, change among prepared depths and dates, then select a real Argo float to inspect its profile and compare observed temperature with the model.
 
-> **Current submission goal:** build an exceptional, believable frontend that can be presented through a polished **YouTube video**. Production-scale backend/data infrastructure comes later.
+| Prepared model data | Observations |
+| --- | --- |
+| 181 × 229 render grid: **41,449 cells per frame** at about 0.083° spacing | **15 real Argo profiles** in the analysis region |
+| 4 dates × 6 depths × 4 variables = **96 model grids** | 15 valid temperature profiles; 14 valid salinity profiles |
+| 121 × 145 cells (**17,545**) in the inner analysis box | 15 precomputed model–observation temperature comparisons |
 
----
-
-# Submission strategy
-
-For this stage, effort is intentionally concentrated on what is visible in the video:
-
-| Priority | Approx. effort | Focus |
-|---|---:|---|
-| Frontend quality | 60% | 3D globe, UI/UX, charts, visual polish |
-| Interaction & motion | 20% | Camera motion, sliders, current flow, transitions |
-| Demo data | 10% | Real/curated lightweight ocean data |
-| Video & story | 10% | Script, scene order, captions, recording |
-
-The rule is simple:
-
-> If a task does not noticeably improve the frontend, scientific credibility, interaction quality, or final video, it is not a priority for this submission stage.
-
----
-
-# Active team
-
-The active build team is now **4 people**, working in parallel.
-
-| Name | Role | Branch |
-|---|---|---|
-| **Krishna Kumar Jha** | Frontend Engineering Lead, 3D & Integration | `feat/integration` |
-| **Anush** | Frontend Design Lead, UI/UX & Argo Experience | `feat/argo-validation` |
-| **Adithya** | Demo Data, Scientific Direction & Video | `feat/ocean-data` |
-| **Prabhu** | Frontend State, Data & Interaction Logic | `feat/backend-api` |
-
-Permanent branches:
-
-- `main` — stable/demo-ready versions
-- `develop` — shared integration branch
-
-> **Central rule:** `develop` should always contain a complete, recordable demo path.
-
----
-
-# Locked frontend stack
-
-To avoid wasting time on library decisions, the submission build uses:
-
-| Area | Choice |
-|---|---|
-| 3D | Three.js / React Three Fiber |
-| Charts | **Apache ECharts** |
-| Styling | **Tailwind CSS** |
-| State | **Zustand** |
-| Demo data | **`frontend/public/demo-data/`** |
-| Recording target | **1920×1080, 16:9** |
-
-Why:
-
-- **ECharts** gives us cleaner styling and animation for scientific profile charts.
-- **Tailwind** makes rapid visual iteration easier across the frontend.
-- **Zustand** keeps the globe, controls, timeline and Argo selection synchronized without Redux overhead.
-- **public/demo-data** keeps the prototype self-contained and easy to replace with a real backend later.
-
----
-
-# Product demo flow
-
-The frontend is built around this exact recording sequence:
-
-1. OceanX opens on a beautiful 3D Earth.
-2. Camera zooms smoothly to the **Bay of Bengal**.
-3. **Temperature** layer appears.
-4. Depth changes from surface → 100 m → deeper.
-5. Prepared time frames animate.
-6. **Currents** turn on with arrows/particles.
-7. **Argo observations** appear.
-8. User selects one Argo float.
-9. A premium details panel opens.
-10. **Model vs Observation** profile chart appears.
-11. RMSE/mismatch is shown.
-12. One scientific insight/alert appears.
-13. Video ends on a polished hero shot.
-
-If this sequence is smooth, understandable and visually strong, the submission-stage prototype succeeds.
-
----
-
-# 4-person parallel architecture
-
-```text
-                    Adithya
-          Demo data + scientific story
-                       │
-                       ▼
-                     Prabhu
-          State + data + interaction logic
-                 │             │
-                 ▼             ▼
-                KKJ           Anush
-          3D / currents    UI / UX / Argo
-                 │             │
-                 └──────┬──────┘
-                        ▼
-               Recording-ready OceanX
-                        │
-                        ▼
-                YouTube submission
+```mermaid
+flowchart LR
+    C[Copernicus Marine model grids] --> P[Python and Xarray export]
+    A[Argo GDAC float profiles] --> P
+    P --> J[Local demo-data JSON]
+    J --> D[Frontend data layer]
+    D --> S[Zustand view state and React Query cache]
+    S --> G[Cesium globe and overlays]
+    S --> U[React controls and comparison panels]
 ```
 
-Nobody should need to wait for another person to finish:
+## Why OceanX
 
-- KKJ starts with mock arrays.
-- Anush starts with static UI/mock data.
-- Adithya prepares real/curated data independently.
-- Prabhu builds Zustand state + local data loaders against the existing mock files.
+Ocean conditions change below the surface and over time, while observations are scattered across individual float locations. OceanX places a dense model field and sparse measured profiles in one geographic view so a reviewer can see both the pattern and where it disagrees with a measurement.
 
----
+## Current Prototype
 
-# Krishna Kumar Jha — Frontend Engineering Lead, 3D & Integration
+The working prototype starts over the Bay of Bengal. Controls select temperature or salinity, one of six prepared depth levels, and one of four daily frames from 20–23 April 2025. Currents can be shown as animated particles, and blue Argo markers can be selected to open vertical profiles, a model-versus-observation chart, RMSE, and a largest-difference insight. The comparison is for **temperature**; a salinity comparison is not exported. The displayed depth is a requested label mapped to the nearest actual Copernicus level.
 
-**Branch:** `feat/integration`
+## Real Data Sources
 
-## Owns
+| Source | Role | Used data |
+| --- | --- | --- |
+| [Copernicus Marine Global Ocean Physics Analysis and Forecast](https://data.marine.copernicus.eu/product/GLOBAL_ANALYSISFORECAST_PHY_001_024/services), product `GLOBAL_ANALYSISFORECAST_PHY_001_024` | Dense gridded model field | Daily potential temperature (`thetao`), salinity (`so`), eastward (`uo`) and northward (`vo`) current velocity |
+| [Argo Global Data Assembly Centres](https://argo.ucsd.edu/data/data-from-gdacs/) | Sparse in situ observations | Float positions and quality controlled, delayed mode adjusted vertical temperature and salinity profiles |
 
-### 3D engine
-- 3D globe
-- camera motion
-- Bay of Bengal zoom
-- temperature/salinity rendering
-- Argo marker rendering
-- current arrows/particles
-- performance
+The bundled data has fixed dates and is served as local JSON. Running the frontend does not query either provider.
 
-### Frontend engineering
-- technical frontend architecture
-- globe/UI integration
-- state synchronization with Prabhu
-- animation timing
-- final recording-ready build
+## Architecture
 
-## Checklist
+The Python exporter in [`scripts/prepare_demo_data.py`](scripts/prepare_demo_data.py) coordinates Copernicus downloads, Argo selection, JSON export, comparisons, and validation. Its modules in [`scripts/demo_data/`](scripts/demo_data/) do the scientific data work. The Vite/React frontend reads [`manifest.json`](frontend/public/demo-data/manifest.json) first, then loads selected frames and related assets. Cesium renders the globe; the UI and globe share selection through Zustand.
 
-- [ ] Maintain working globe
-- [ ] Add camera presets / cinematic movement
-- [ ] Render temperature layer
-- [ ] Render salinity layer
-- [ ] Connect depth/time state
-- [ ] Render Argo markers
-- [ ] Connect selected marker state
-- [ ] Build current-flow animation
-- [ ] Tune performance for 1080p recording
-- [ ] Integrate Anush's UI
-- [ ] Test the complete video path
-- [ ] Keep `develop` recordable
+## Data Flow
 
-## Definition of done
-
-The visual engine runs smoothly from opening shot through ocean layers, currents, Argo selection and final hero view.
-
----
-
-# Anush — Frontend Design Lead, UI/UX & Argo Experience
-
-**Branch:** `feat/argo-validation`
-
-Anush owns **how OceanX looks and feels**.
-
-## Owns
-
-### Visual design
-- layout/composition
-- typography
-- color system
-- spacing
-- cards/panels
-- loading states
-- transitions/micro-interactions
-
-### Controls
-- variable selector
-- depth slider
-- timeline
-- Argo/current toggles
-- legends
-
-### Argo experience
-- Argo details panel
-- float metadata
-- model-vs-observation chart
-- RMSE/mismatch display
-- insight/alert card
-
-## Checklist
-
-- [ ] Define the OceanX visual system
-- [ ] Design the main 1920×1080 layout
-- [ ] Build variable selector
-- [ ] Build depth control
-- [ ] Build timeline
-- [ ] Build layer toggles
-- [ ] Build legends
-- [ ] Build loading states
-- [ ] Build Argo details panel
-- [ ] Build ECharts comparison chart
-- [ ] Build RMSE/insight card
-- [ ] Coordinate marker/select states with KKJ
-- [ ] Coordinate state/data needs with Prabhu
-- [ ] Coordinate scientific content with Adithya
-- [ ] Run final visual polish pass
-
-## Design direction
-
-Aim for:
-
-> **Google Earth + premium scientific control center**
-
-The 3D globe should dominate the screen; the dashboard should support it rather than bury it.
-
-## Definition of done
-
-Every control, chart and panel used in the YouTube recording looks intentional, premium and easy to understand.
-
----
-
-# Adithya — Demo Data, Scientific Direction & Video
-
-**Branch:** `feat/ocean-data`
-
-## Owns
-
-### Demo data
-- Bay of Bengal demo region/time
-- temperature layers
-- salinity layers
-- U/V current data
-- prepared depth frames
-- prepared time frames
-- Argo/example profile data with Anush
-
-### Scientific direction
-- units
-- realistic ranges
-- labels
-- terminology
-- claims shown on screen
-- real vs curated-data documentation
-
-### Video
-- recording sequence
-- script/voiceover
-- captions
-- product messaging
-- deciding what interactions make the final cut
-
-## Data strategy
-
-Prefer **real publicly available oceanographic data**, then preprocess/downsample it into frontend-friendly JSON.
-
-Recommended structure:
-
-```text
-frontend/public/demo-data/
-├── ocean/
-│   ├── temperature/
-│   │   ├── t0-depth-0.json
-│   │   ├── t0-depth-50.json
-│   │   ├── t0-depth-100.json
-│   │   └── ...
-│   ├── salinity/
-│   └── currents/
-├── argo/
-│   ├── markers.json
-│   └── profiles.json
-└── comparison/
-    └── argo-001.json
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as React controls
+    participant Store as Zustand store
+    participant Data as Demo data loader
+    participant Globe as Cesium globe
+    User->>UI: Choose variable, depth, or date
+    UI->>Store: Update selected IDs
+    Store->>Data: Request matching JSON frame
+    Data-->>Globe: Grid and metadata
+    Globe-->>User: Updated ocean layer and currents
+    User->>Globe: Select blue Argo marker
+    Globe->>Store: Set selected Argo ID
+    Store->>Data: Load profile and comparison
+    Data-->>UI: Observed and model pairs, RMSE
+    UI-->>User: Profile and comparison panel
 ```
 
-Use curated/mock values only where useful for prototype insights or transitions, and do not present invented values as verified live measurements.
-
-## Definition of done
-
-Every scene in the video has scientifically believable data and a clear story.
-
----
-
-# Prabhu — Frontend State, Data & Interaction Logic
-
-**Branch:** `feat/backend-api`
-
-For this stage, Prabhu does **not** need to build a complete FastAPI backend.
-
-The goal is a clean frontend data abstraction that can read local JSON now and be replaced by API calls later.
-
-## Owns
-
-### Zustand store
-
-Conceptually:
-
-```ts
-type OceanState = {
-  variable: "temperature" | "salinity" | "currents";
-  depth: number;
-  timeIndex: number;
-
-  showCurrents: boolean;
-  showArgo: boolean;
-
-  selectedArgoId: string | null;
-};
+```mermaid
+flowchart LR
+    M[Copernicus model: 181 by 229 render cells, depth, time] --> V[Continuous map layer]
+    A[Argo: 15 point locations and vertical profiles] --> B[Blue selectable markers]
+    M --> X[Temperature comparison]
+    A --> X
 ```
 
-### Data layer
+The blue Argo markers indicate measured float locations; they are **not** model-grid cells.
 
-Target interface:
+## Ocean Model Dataset
 
-```ts
-getOceanLayer(variable, depth, time)
-getCurrents(time)
-getArgoFloats()
-getComparison(id)
-```
+The three daily Copernicus datasets are `cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m`, `cmems_mod_glo_phy-so_anfc_0.083deg_P1D-m`, and `cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m`. Exported `u` and `v` are separate depth/date grids. Four additional `currents/t*.json` files contain surface `u`, `v`, and derived speed for the particle display. Land and missing model cells remain `null`, not fabricated ocean values.
 
-### Interaction wiring
+| Extent | Bounds | Grid |
+| --- | --- | --- |
+| `analysisBounds` | 10–20°N, 80–92°E | 121 × 145 = 17,545 cells |
+| `renderBounds` | 7–22°N, 77–96°E | 181 × 229 = 41,449 cells |
 
-- variable selector → correct ocean layer
-- depth slider → correct depth frame
-- timeline → correct time frame
-- toggles → visibility
-- marker click → `selectedArgoId`
-- selected Argo → details/comparison panel
+The larger render extent pads every side of the logical analysis region so the colored layer and current particles remain visible around the Bay of Bengal view. The native spacing is approximately 1/12° (0.08333°). The four model timestamps are 00:00 UTC on 20, 21, 22, and 23 April 2025.
 
-## Checklist
+| Requested depth | Actual model depth |
+| ---: | ---: |
+| 0 m | 0.494025 m |
+| 50 m | 47.373692 m |
+| 100 m | 92.326073 m |
+| 150 m | 155.850693 m |
+| 200 m | 186.125595 m |
+| 500 m | 541.088928 m |
 
-- [ ] Build Zustand store
-- [ ] Define stable TypeScript interfaces
-- [ ] Build demo-data loaders
-- [ ] Load temperature/salinity frames
-- [ ] Load current data
-- [ ] Load Argo marker data
-- [ ] Load comparison data
-- [ ] Connect variable switching
-- [ ] Connect depth switching
-- [ ] Connect time switching
-- [ ] Connect toggles
-- [ ] Connect Argo selection
-- [ ] Preload important recording frames
-- [ ] Keep interaction path working on `develop`
+## Argo Observations
 
-## Definition of done
+The 15 selected real profiles fall between approximately 10.16943–17.88333°N and 84.594–91.13333°E, observed from 20 April 2025 14:13:45 UTC through 23 April 2025 18:09:06 UTC. All 15 have valid temperature; 14 have valid salinity. The exporter uses adjusted delayed mode values with good quality flags, converts pressure to depth, and keeps missing salinity masked.
 
-KKJ's globe and Anush's UI stay synchronized through one predictable state/data layer.
+For each float, the exporter takes the nearest model time and horizontal grid point, interpolates the model vertical temperature profile to valid observed depths within their overlap, and computes `difference = model − observation` and RMSE. The insight reports the largest paired temperature difference and depth; it does not diagnose its cause.
 
----
+## Frontend Architecture
 
-# Globe ↔ UI contract
+| Component | Current implementation |
+| --- | --- |
+| 3D globe | Cesium viewer in [`frontend/src/globe/`](frontend/src/globe/) |
+| Ocean layer | Canvas colored from real temperature/salinity grid values, then added as a Cesium single-tile imagery layer; missing cells are transparent |
+| Currents | Canvas particle overlay driven by the prepared surface velocity grid |
+| Argo markers | Selectable Cesium entities connected to shared Argo selection |
+| State and loading | Zustand in [`frontend/src/store/`](frontend/src/store/); cached JSON loader in [`frontend/src/data/`](frontend/src/data/); React Query for panel requests |
+| Interface | React and Tailwind CSS controls; Apache ECharts profile/comparison charts |
 
-This interface should stay small.
-
-## Shared Zustand state
-
-```text
-variable
-depth
-timeIndex
-showArgo
-showCurrents
-selectedArgoId
-```
-
-## Argo marker contract
-
-```ts
-interface ArgoMarker {
-  id: string;
-  latitude: number;
-  longitude: number;
-  label?: string;
-  status?: "active" | "recent";
-}
-```
-
-When KKJ's globe marker is clicked:
-
-```text
-marker click
-    ↓
-selectedArgoId changes in Zustand
-    ↓
-Anush's Argo panel opens
-```
-
-No direct dependency between the globe implementation and the details panel is required.
-
----
-
-# Repository direction
-
-The current repo already contains legacy backend/data folders from the earlier plan. They can remain, but **current submission work should concentrate inside the frontend**.
-
-Target submission structure:
+## Repository Structure
 
 ```text
 OceanX/
 ├── frontend/
-│   ├── public/
-│   │   └── demo-data/          # Adithya
-│   │
-│   └── src/
-│       ├── globe/              # KKJ
-│       ├── currents/           # KKJ
-│       ├── dashboard/          # Anush
-│       ├── controls/           # Anush
-│       ├── charts/             # Anush
-│       ├── argo/               # Anush
-│       ├── state/              # Prabhu
-│       ├── data/               # Prabhu
-│       └── types/              # Shared contracts
-│
-├── backend/                    # Post-submission priority
-├── ocean_data/                 # Supporting scripts / future pipeline
-├── observations/               # Future scientific pipeline
-└── analytics/                  # Future analytics pipeline
+│   ├── public/demo-data/       # Runtime manifest, model grids, Argo, comparisons
+│   ├── src/globe/              # Cesium and renderers
+│   ├── src/data/               # Typed JSON loader and adapters
+│   ├── src/store/              # Shared view state
+│   └── src/components/         # Controls, layout, charts, panels
+├── scripts/
+│   ├── prepare_demo_data.py    # Export/validation command
+│   ├── demo_data/              # Copernicus, Argo, comparison, validation modules
+│   └── tests/                  # Data pipeline tests
+├── docs/                       # Data contracts and provenance
+├── data/raw/                   # Ignored source downloads/cache
+└── backend/                    # Separate minimal API scaffold; not used by the demo
 ```
 
----
+## Running the Project
 
-# Integrated baseline
+Node.js and npm are required. The committed demo assets are sufficient to run the frontend without Copernicus credentials.
 
-At every major checkpoint, `develop` should support:
-
-- [ ] globe opens
-- [ ] camera can move/zoom
-- [ ] temperature layer appears
-- [ ] depth changes work
-- [ ] time changes work
-- [ ] currents can be enabled
-- [ ] Argo markers appear
-- [ ] one marker can be selected
-- [ ] details/comparison panel opens
-- [ ] one insight/alert can be shown
-
-> Feature branches improve the experience; the complete video flow should remain usable on `develop`.
-
----
-
-# Git workflow
-
-```text
-feature branch
-      ↓
-small commits
-      ↓
-Pull Request
-      ↓
-develop
-      ↓
-recordable integrated build
-      ↓
-main when stable
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
 
-Useful commit prefixes:
+Open the local URL printed by Vite. Use `npm run build` for a production build and `npm run preview` to serve it. The globe includes local Natural Earth imagery; the optional high-resolution Esri imagery layer uses an external tile service.
 
-```text
-feat(globe):
-feat(ui):
-feat(state):
-feat(data):
-feat(argo):
-feat(currents):
-fix(...):
-docs:
-chore:
+## Data Preparation
+
+Regeneration requires Python 3.12+, the packages in [`scripts/requirements-demo-data.txt`](scripts/requirements-demo-data.txt), access to Argo GDAC, and Copernicus Marine authentication for model downloads. From the repository root, after activating a Python environment:
+
+```bash
+python -m pip install -r scripts/requirements-demo-data.txt
+python scripts/prepare_demo_data.py inspect
+copernicusmarine login
+python scripts/prepare_demo_data.py build
+python scripts/prepare_demo_data.py validate
 ```
 
----
+`inspect` checks catalogue metadata; `build` fetches/caches source NetCDF and Argo files, exports the JSON assets, and validates them. `argo` refreshes observation assets and comparisons using the cached model file; `render` refreshes model frames. Source files are cached under ignored `data/raw/`. See [`docs/demo-data.md`](docs/demo-data.md) for the detailed regeneration procedure.
 
-# Explicitly postponed
+## Validation
 
-Do not spend current submission time on:
+From the repository root, validate exported dimensions, masks, metadata, cross-file references, and comparison arithmetic:
 
-- full FastAPI backend
-- production NetCDF serving
-- Kerchunk / VirtualiZarr
-- authentication
-- global-scale data access
-- real-time streaming
-- production Docker/cloud architecture
-- full scientific validation engine
-- search-and-rescue simulation
-- WebGPU migration
+```bash
+python scripts/prepare_demo_data.py validate
+python -m unittest discover -s scripts/tests -v
+cd frontend
+npm run test:data
+npm run typecheck
+npm run build
+```
 
-These remain part of the full implementation vision after the video prototype.
+## Current Scope
 
----
+**Real:** Copernicus model values, geographic coordinates, timestamps, depth levels, temperature/salinity/current grids, and Argo positions and profiles. The exported comparison statistics are calculated from these sources.
 
-# Submission-stage Definition of Done
+**Prototype:** The presentation and interactions, locally served preprocessed JSON frames, fixed four-date window, and precomputed comparisons. The app does not stream live observations or run an on-demand forecast. Older files in `frontend/public/demo-data/ocean-slices/`, `comparison/`, `argo-profiles.json`, and `currents.json` are legacy development assets; the current loader uses `ocean/`, `currents/`, `argo/`, and `comparisons/`.
 
-- [ ] 1920×1080 layout looks premium
-- [ ] opening globe scene is visually impressive
-- [ ] temperature/salinity layers look convincing
-- [ ] depth control visibly changes the ocean
-- [ ] time animation works
-- [ ] currents animate smoothly
-- [ ] Argo markers appear cleanly
-- [ ] marker click opens Argo details
-- [ ] model-vs-observation ECharts graph works
-- [ ] RMSE/insight is visible
-- [ ] data/terminology are scientifically believable
-- [ ] no unfinished/debug states appear in the recording path
-- [ ] `develop` can be recorded end-to-end
-- [ ] final YouTube video is understandable without technical explanation
+## Future Direction
+
+The current data contract allows larger regions and time windows or an API-backed loader later. Broader model–observation validation and live data access would require additional processing and operational infrastructure.
