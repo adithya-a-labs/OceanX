@@ -36,6 +36,16 @@ try {
   useOceanStore.getState().selectArgo(manifest.featuredArgoId);
   assert.equal(useOceanStore.getState().selectedArgoId, manifest.featuredArgoId);
   const markers = await data.getArgoMarkers();
+  assert.equal(markers.length, manifest.argoIds.length);
+  assert(markers.length >= 10);
+  assert.equal(new Set(markers.map(marker => marker.id)).size, markers.length);
+  const allProfiles = await Promise.all(markers.map(marker => data.getArgoProfile(marker.id)));
+  for (const [index, item] of allProfiles.entries()) {
+    assert.equal(item.id, markers[index].id);
+    assert.equal(item.latitude, markers[index].latitude);
+    assert.equal(item.longitude, markers[index].longitude);
+    assert(item.depthM.length >= 10);
+  }
   const profile = await data.getArgoProfile(manifest.featuredArgoId);
   assert(markers.some(m => m.id === profile.id && m.featured));
   assert(profile.depthM.at(-1) >= 500);
@@ -55,6 +65,8 @@ try {
   assert.equal(currents.u.length, currents.latitudes.length);
   const comparison = await data.getComparison(profile.id);
   assert.equal(comparison.observationId, profile.id);
+  const comparisons = await Promise.all(markers.map(marker => data.getComparison(marker.id)));
+  comparisons.forEach((item, index) => assert.equal(item.observationId, markers[index].id));
   console.log('Frontend data and state smoke test passed.');
 } finally {
   globalThis.fetch = originalFetch;

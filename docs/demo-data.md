@@ -1,6 +1,6 @@
 # OceanX demo data
 
-The recording data lives under `frontend/public/demo-data/`. `manifest.json` is the source of truth for Bay of Bengal bounds, actual model depths, time IDs, source variables, and readiness. `demo-sequence.json` pins the recording path. Four QC-filtered observations live in `argo/profiles/<id>.json`. The generator writes `ocean/{temperature,salinity,u,v}/t0..t3/depth-{0,50,100,150,200,500}.json`, `currents/t0..t3.json`, and `comparisons/<id>.json`.
+The recording data lives under `frontend/public/demo-data/`. `manifest.json` is the source of truth for Bay of Bengal bounds, actual model depths, time IDs, source variables, and readiness. `demo-sequence.json` pins the recording path. Fifteen QC-filtered observations live in `argo/profiles/<id>.json`. The generator writes `ocean/{temperature,salinity,u,v}/t0..t3/depth-{0,50,100,150,200,500}.json`, `currents/t0..t3.json`, and `comparisons/<id>.json`.
 
 **Current checkout:** `assetsReady` is `true`. The Copernicus model grids, surface currents, Argo profiles, and comparisons are exported. The old `ocean-slices/`, `comparison/`, `currents.json`, and `argo-profiles.json` files are legacy development placeholders and are not read by the current data service or globe adapter.
 
@@ -24,7 +24,7 @@ py -3.12 -m venv .venv
 
 `copernicusmarine login` stores credentials outside the repository. For headless runs, set `COPERNICUSMARINE_SERVICE_USERNAME` and `COPERNICUSMARINE_SERVICE_PASSWORD` in the process environment. Never put them in source or JSON. `build` checks authentication before downloading and gives a clear error if absent. Source NetCDF and GDAC files are cached in ignored `data/raw/`. Only compact JSON is committed.
 
-The source window is 20–23 April 2025. `discover` ranks historical four-day windows using the official GDAC index; this one contained 15 platforms and 23 delayed-mode files in the selected box. Four profiles with valid adjusted temperature, salinity and depth through roughly 2 km were selected. Model grids and currents retain all 121 × 145 native horizontal cells. The three source NetCDF subsets are cached in ignored `data/raw/`.
+The Argo source window is April 20-23, 2025. The official GDAC index contains 23 delayed-mode core files from 15 platforms in the selected box. The exporter keeps one QC-filtered profile per platform, preferring the four existing profiles and otherwise a profile with salinity and greater depth. One selected profile has temperature but no valid adjusted salinity. If fewer than 10 floats are available, the script retries with 3, 7, then 14 days of padding on each side. `argo` refreshes only Argo JSON, comparisons, and the manifest Argo IDs; it uses the cached temperature NetCDF for comparisons and leaves model assets unchanged. Model grids and currents retain all 121 by 145 native horizontal cells. Source NetCDF, GDAC files, and the GDAC index are cached in ignored `data/raw/`.
 
 ## Frontend contract
 
