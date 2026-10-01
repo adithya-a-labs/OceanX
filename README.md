@@ -176,4 +176,4 @@ npm run build
 
 ## Future Direction
 
-The current data contract allows larger regions and time windows or an API-backed loader later. Broader model–observation validation and live data access would require additional processing and operational infrastructure.
+The current data contract allows larger regions and time windows or an API-backed loader later. Broader model–observation validation and live data access would require additional processing and operational infrastructure. This is really useful.
